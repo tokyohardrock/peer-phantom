@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
+	"os/signal"
 
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -18,6 +19,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	multiaddr "github.com/multiformats/go-multiaddr"
+
+	"p2pchat/terminal"
 )
 
 const (
@@ -25,7 +28,18 @@ const (
 	KEY_FILE = "key"
 )
 
-var startRead = make(chan bool)
+type mssg struct {
+	author string
+	message string
+}
+
+var streams = make(map[string]network.Stream, 30)
+var streamsMutex = sync.Mutex{}
+
+var chats = make(map[string][]mssg, 30)
+var chatsMutex = sync.Mutex{}
+
+var myPeerID, remotePeerID string
 
 func initPeer() (host.Host, error) {
 	privKey, err := loadPrivateKey(KEY_FILE)
@@ -80,22 +94,13 @@ func printPeerInfo(host host.Host) {
 	fmt.Println()
 }
 
-func askMultiaddress(reader *bufio.Reader) string {
-	var maddrStr string
-	var err error
-
-	for {
-		fmt.Print("Enter peer multiaddress: ")
-
-		maddrStr, err = reader.ReadString('\n')
-		if err == nil {
-			break
-		}
-
-		log.Println("Failed to parse message: ", err)
+func trimInput(reader *bufio.Reader) (string, error) {
+	maddrStr, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
 	}
 
-	return  strings.TrimSpace(maddrStr)
+	return  strings.TrimSpace(maddrStr), nil
 }
 
 func connectToPeer(ctx context.Context, maddrStr string, host host.Host) (*peer.AddrInfo, error) {
@@ -119,54 +124,79 @@ func connectToPeer(ctx context.Context, maddrStr string, host host.Host) (*peer.
 }
 
 func readMessage(s network.Stream){
-	defer s.Close()
-
+	senderPeerID := s.Conn().RemotePeer().String()
 	reader := bufio.NewReader(s)
+
 	for {
-		startRead<-true
-
-		for {
-			message, err := reader.ReadString('\n')
-			if err != nil {
-				return
-			}
-
-			if len(message) == 0 {
-				startRead<-true
-				break
-			}
-
-			fmt.Print("< ", message)
+		message, err := reader.ReadString('\n')
+		if err != nil {
+			log.Println("Failed to read message: ", err)
+			return
 		}
+
+		updateHistory(senderPeerID, senderPeerID, message)
 	}
 }
 
-func writeMessage(reader *bufio.Reader, stream network.Stream) {
+func writeMessage(reader *bufio.Reader, s network.Stream) {
 	for {
-		fmt.Print("> ")
 		message, err := reader.ReadString('\n')
 		if err != nil {
 			log.Println("Failed to parse message: ", err)
-			break
+			return
 		}
 
-		_, err = stream.Write([]byte(message))
+		_, err = s.Write([]byte(message))
 		if err != nil {
 			log.Println("Failed to send message: ", err)
-			break
+			return
 		}
+
+		updateHistory(myPeerID, s.Conn().RemotePeer().String(), message)
 	}
+}
+
+func shortPeerID(peerID string) string {
+	if len(peerID) > 6 {
+		return peerID[len(peerID)-6:]
+	}
+	return peerID
+}
+
+func updateHistory(author string, peerID string, message string) {
+	chatsMutex.Lock()
+
+	if chats[peerID] == nil {
+		chats[peerID] = make([]mssg, 0, 100)
+	}
+
+	chats[peerID] = append(chats[peerID], mssg{
+		author: shortPeerID(author),
+		message: message,
+	})
+
+	chatsMutex.Unlock()
+
+	fmt.Print(shortPeerID(author), ": ", message)
+}
+
+func streamHandler(s network.Stream) {
+	streamsMutex.Lock()
+	streams[s.Conn().RemotePeer().String()] = s
+	streamsMutex.Unlock()
 }
 
 func gracefulShutdown(sigChan chan os.Signal) {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	fmt.Println("\nGoodbye!")
+	fmt.Printf("\n%d\n", len(streams))
 	os.Exit(0)
 }
 
 func main(){
+	terminal.Clear()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -179,50 +209,50 @@ func main(){
 	}
 	defer host.Close()
 
-	host.SetStreamHandler(PROTOCOL, readMessage)
+	myPeerID = host.ID().String()
+
+	host.SetStreamHandler(PROTOCOL, streamHandler)
 
 	fmt.Println("-=* Peer Phantom *=-")
 	printPeerInfo(host)
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Println("Read(1) or write(2) message?: ")
+		remotePeerID = ""
 
-		md, err := reader.ReadString('\n')
+		fmt.Print("Enter multiaddress: ")
+
+		maddr, err := trimInput(reader)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		md = strings.TrimSpace(md)
 
-		if md != "1" && md != "2" {
-			fmt.Println("Invalid argument!")
-			continue
-		}
-
-		if md == "1" {
-			<-startRead
-			<-startRead
-			continue
-		}
-
-		maddrStr := askMultiaddress(reader)
-
-		info, err := connectToPeer(ctx, maddrStr, host)
+		info, err := connectToPeer(ctx, maddr, host)
 		if err != nil {
 			log.Println("! Failed to connect to peer: ", err)
 			continue
 		}
 
-		stream, err := host.NewStream(ctx, info.ID, PROTOCOL)
-		if err != nil {
-			log.Println("Failed to create new stream to chosen peer: ", err)
-			continue
+		remotePeerID = info.ID.String()
+
+		streamsMutex.Lock()
+
+		stream := streams[remotePeerID]
+
+		if stream == nil {
+			stream, err = host.NewStream(ctx, info.ID, PROTOCOL)
+			if err != nil {
+				log.Println("Failed to create new stream to chosen peer: ", err)
+				continue
+			}
+
+			streams[remotePeerID] = stream
 		}
-		defer stream.Close()
 
-		fmt.Println("Connected! Type messages (Ctrl+C to quit):")
+		streamsMutex.Unlock()
 
+		go readMessage(stream)
 		writeMessage(reader, stream)
 	}
 }

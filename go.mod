@@ -1,4 +1,4 @@
-module p2pchat
+module peer-phantom
 
 go 1.25.5
 

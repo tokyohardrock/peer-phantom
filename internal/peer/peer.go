@@ -3,10 +3,13 @@ package peer
 import (
 	"bufio"
 	"context"
+	"crypto/ecdh"
 	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
+
+	"github.com/libp2p/go-libp2p/core/crypto"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -27,13 +30,21 @@ type Mssg struct {
 	Message string
 }
 
+type SafeStream struct {
+	Stream network.Stream
+	Key    []byte
+}
+
 type Peer struct {
 	Host host.Host
+
+	PrivKey        crypto.PrivKey
+	SessionPrivKey *ecdh.PrivateKey
 
 	MyPeerID     string
 	ActivePeerID atomic.Value
 
-	Streams    map[string]network.Stream
+	Streams    map[string]SafeStream
 	StreamsMut sync.RWMutex
 
 	Chats    map[string][]Mssg
@@ -60,9 +71,10 @@ func (P *Peer) Init() error {
 	}
 
 	P.Host = host
+	P.PrivKey = privKey
 	P.MyPeerID = host.ID().String()
 	P.ActivePeerID.Store("")
-	P.Streams = make(map[string]network.Stream, 100)
+	P.Streams = make(map[string]SafeStream, 100)
 	P.StreamsMut = sync.RWMutex{}
 	P.Chats = make(map[string][]Mssg, 100)
 	P.ChatsMut = sync.RWMutex{}
@@ -95,7 +107,7 @@ func (P *Peer) ConnectToPeer(ctx context.Context, maddrStr string) (*peer.AddrIn
 
 func (P *Peer) GetStreamToPeer(ctx context.Context, info *peer.AddrInfo) error {
 	P.StreamsMut.RLock()
-	stream := P.Streams[info.ID.String()]
+	stream := P.Streams[info.ID.String()].Stream
 	P.StreamsMut.RUnlock()
 
 	if stream == nil {
@@ -137,7 +149,7 @@ func (P *Peer) WriteToStream(message string) error {
 	stream := P.Streams[activePeerID]
 	P.StreamsMut.RUnlock()
 
-	_, err := stream.Write([]byte(message))
+	_, err := stream.Stream.Write([]byte(message))
 	if err != nil {
 		return err
 	}
@@ -175,7 +187,10 @@ func (P *Peer) UpdateChatHistory(remotePeerID string, message Mssg) {
 
 func (P *Peer) streamsHandler(s network.Stream) {
 	P.StreamsMut.Lock()
-	P.Streams[s.Conn().RemotePeer().String()] = s
+	P.Streams[s.Conn().RemotePeer().String()] = SafeStream{
+		Stream: s,
+		Key:    []byte(nil),
+	}
 	P.StreamsMut.Unlock()
 
 	go P.ReadFromStream(s)

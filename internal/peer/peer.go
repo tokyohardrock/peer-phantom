@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/ecdh"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
+	"peer-phantom/internal/e2ee"
 	"peer-phantom/internal/utils"
 )
 
@@ -32,19 +34,21 @@ type Mssg struct {
 
 type SafeStream struct {
 	Stream network.Stream
-	Key    []byte
+	Secret []byte
 }
 
 type Peer struct {
-	Host host.Host
+	Host    host.Host
+	PrivKey crypto.PrivKey
 
-	PrivKey        crypto.PrivKey
-	SessionPrivKey *ecdh.PrivateKey
+	SessionPrivKey      *ecdh.PrivateKey
+	SessionPubKey       *ecdh.PublicKey
+	SignedSessionPubKey []byte
 
 	MyPeerID     string
 	ActivePeerID atomic.Value
 
-	Streams    map[string]SafeStream
+	Streams    map[string]*SafeStream
 	StreamsMut sync.RWMutex
 
 	Chats    map[string][]Mssg
@@ -74,13 +78,20 @@ func (P *Peer) Init() error {
 	P.PrivKey = privKey
 	P.MyPeerID = host.ID().String()
 	P.ActivePeerID.Store("")
-	P.Streams = make(map[string]SafeStream, 100)
+	P.Streams = make(map[string]*SafeStream, 100)
 	P.StreamsMut = sync.RWMutex{}
 	P.Chats = make(map[string][]Mssg, 100)
 	P.ChatsMut = sync.RWMutex{}
 	P.NewMessage = make(chan struct{}, 1)
 
-	host.SetStreamHandler(PROTOCOL, P.streamsHandler)
+	P.SessionPrivKey, P.SessionPubKey, P.SignedSessionPubKey, err = e2ee.GenerateSessionKeys(privKey)
+	if err != nil {
+		return err
+	}
+
+	host.SetStreamHandler(PROTOCOL, func(s network.Stream) {
+		_ = P.streamsHandler(s)
+	})
 
 	return nil
 }
@@ -105,25 +116,30 @@ func (P *Peer) ConnectToPeer(ctx context.Context, maddrStr string) (*peer.AddrIn
 	return info, nil
 }
 
-func (P *Peer) GetStreamToPeer(ctx context.Context, info *peer.AddrInfo) error {
+func (P *Peer) CheckStream(ctx context.Context, info string) *SafeStream {
 	P.StreamsMut.RLock()
-	stream := P.Streams[info.ID.String()].Stream
+	stream := P.Streams[info]
 	P.StreamsMut.RUnlock()
 
+	return stream
+}
+
+func (P *Peer) GetStreamToPeer(ctx context.Context, info peer.ID) (*SafeStream, error) {
+	stream := P.CheckStream(ctx, info.String())
 	if stream == nil {
-		stream, err := P.Host.NewStream(ctx, info.ID, PROTOCOL)
+		s, err := P.Host.NewStream(ctx, info, PROTOCOL)
 		if err != nil {
-			return err
+			return nil, errors.New("GetStreamToPeer: " + err.Error())
 		}
 
-		P.streamsHandler(stream)
+		stream = P.streamsHandler(s)
 	}
 
-	return nil
+	return stream, nil
 }
 
 func (P *Peer) ReadFromStream(s network.Stream) {
-	senderPeerID := s.Conn().RemotePeer().String()
+	remotePeerID := s.Conn().RemotePeer().String()
 	reader := bufio.NewReader(s)
 
 	for {
@@ -133,28 +149,24 @@ func (P *Peer) ReadFromStream(s network.Stream) {
 			return
 		}
 
-		P.UpdateChatHistory(senderPeerID,
+		P.UpdateChatHistory(remotePeerID,
 			Mssg{
-				Author:  utils.GetShortPeerID(senderPeerID),
+				Author:  utils.GetShortPeerID(remotePeerID),
 				Message: message,
 			},
 		)
 	}
 }
 
-func (P *Peer) WriteToStream(message string) error {
-	activePeerID := P.ActivePeerID.Load().(string)
+func (P *Peer) WriteToStream(s network.Stream, message string) error {
+	remotePeerID := s.Conn().RemotePeer().String()
 
-	P.StreamsMut.RLock()
-	stream := P.Streams[activePeerID]
-	P.StreamsMut.RUnlock()
-
-	_, err := stream.Stream.Write([]byte(message))
+	_, err := s.Write([]byte(message))
 	if err != nil {
 		return err
 	}
 
-	P.UpdateChatHistory(activePeerID,
+	P.UpdateChatHistory(remotePeerID,
 		Mssg{
 			Author:  P.MyPeerID,
 			Message: message,
@@ -185,13 +197,17 @@ func (P *Peer) UpdateChatHistory(remotePeerID string, message Mssg) {
 	}
 }
 
-func (P *Peer) streamsHandler(s network.Stream) {
-	P.StreamsMut.Lock()
-	P.Streams[s.Conn().RemotePeer().String()] = SafeStream{
+func (P *Peer) streamsHandler(s network.Stream) *SafeStream {
+	stream := &SafeStream{
 		Stream: s,
-		Key:    []byte(nil),
+		Secret: make([]byte, 0, 32),
 	}
+
+	P.StreamsMut.Lock()
+	P.Streams[s.Conn().RemotePeer().String()] = stream
 	P.StreamsMut.Unlock()
 
 	go P.ReadFromStream(s)
+
+	return stream
 }

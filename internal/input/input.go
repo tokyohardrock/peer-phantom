@@ -5,11 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"peer-phantom/internal/chat"
 	"peer-phantom/internal/peer"
-	"peer-phantom/internal/terminal"
 	"peer-phantom/internal/utils"
 	"strings"
 )
@@ -29,16 +27,21 @@ func commandHandler(ctx context.Context, localPeer *peer.Peer, command []string)
 
 		localPeer.ActivePeerID.Store(info.ID.String())
 
-		err = localPeer.GetStreamToPeer(ctx, info)
+		s, err := localPeer.GetStreamToPeer(ctx, info.ID)
 		if err != nil {
 			return err
 		}
 
 		go chat.ShowChat(localPeer)
-		localPeer.WriteToStream(utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), " joined the chat\n"))
+		localPeer.WriteToStream(s.Stream, utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), " joined the chat\n"))
 	case "/back":
-		if localPeer.ActivePeerID.Load().(string) != "" {
-			localPeer.WriteToStream(utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), " leaved the chat\n"))
+		if peerID := localPeer.ActivePeerID.Load().(string); peerID != "" {
+			s := localPeer.CheckStream(ctx, peerID)
+			if s == nil {
+				return errors.New("commandHandler: stream doesn't exist")
+			}
+
+			localPeer.WriteToStream(s.Stream, utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), " leaved the chat\n"))
 			return errors.New("Leaving chat ...")
 		} else {
 			fmt.Println("Press Ctrl+C to exit")
@@ -62,16 +65,12 @@ func inputHandler(ctx context.Context, localPeer *peer.Peer, rawInput string) er
 		return nil
 	}
 
-	localPeer.StreamsMut.RLock()
-
-	if _, ok := localPeer.Streams[localPeer.ActivePeerID.Load().(string)]; !ok {
-		localPeer.StreamsMut.RUnlock()
-		return errors.New("Unable to find a stream for the specified peer")
+	s := localPeer.CheckStream(ctx, localPeer.ActivePeerID.Load().(string))
+	if s == nil {
+		return errors.New("inputHandler: stream doesn't exist")
 	}
 
-	localPeer.StreamsMut.RUnlock()
-
-	err := localPeer.WriteToStream(utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), ": ", rawInput))
+	err := localPeer.WriteToStream(s.Stream, utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), ": ", rawInput))
 
 	return err
 }
@@ -82,7 +81,7 @@ func ListenStdin(ctx context.Context, localPeer *peer.Peer) {
 	for {
 		localPeer.ActivePeerID.Store("")
 
-		terminal.Clear()
+		// terminal.Clear()
 
 		fmt.Println("-=] Peer Phantom [=-")
 		fmt.Println("Your addresses:")
@@ -98,12 +97,13 @@ func ListenStdin(ctx context.Context, localPeer *peer.Peer) {
 		for {
 			input, err := reader.ReadString('\n')
 			if err != nil {
-				log.Println(err)
+				fmt.Println(err)
 				continue
 			}
 
 			err = inputHandler(ctx, localPeer, input)
 			if err != nil {
+				fmt.Println(err)
 				break
 			}
 		}

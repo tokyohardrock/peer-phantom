@@ -47,7 +47,14 @@ func VerifySessionPubKey(senderPubKey crypto.PubKey, sessionPubBytes []byte, sig
 }
 
 // ComputeSharedSecret computes Diffie-Hellman shared secret
-func ComputeSharedSecret(localPriv *ecdh.PrivateKey, peerPub *ecdh.PublicKey) ([]byte, error) {
+func ComputeSharedSecret(localPriv *ecdh.PrivateKey, remotePub []byte) ([]byte, error) {
+	curve := ecdh.X25519()
+
+	peerPub, err := curve.NewPublicKey(remotePub)
+	if err != nil {
+		panic(err)
+	}
+
 	sharedSecret, err := localPriv.ECDH(peerPub)
 	if err != nil {
 		return nil, err

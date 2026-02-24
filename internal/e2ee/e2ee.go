@@ -6,44 +6,68 @@ import (
 	"crypto/ecdh"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"golang.org/x/crypto/hkdf"
 )
 
+type sessionPubKeys struct {
+	PubKey       []byte `json:"pubKey"`
+	SignedPubKey []byte `json:"signedPubKey"`
+}
+
 // GenerateSessionKeys generates current session keys using the elliptic curve Diffie-Hellman algorithm
-func GenerateSessionKeys(peerPrivKey crypto.PrivKey) (*ecdh.PrivateKey, *ecdh.PublicKey, []byte, error) {
+func GenerateSessionKeys(peerPrivKey crypto.PrivKey) (*ecdh.PrivateKey, []byte, error) {
 	curve := ecdh.X25519()
 
 	sessionPrivKey, err := curve.GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	sessionPubKey := sessionPrivKey.PublicKey()
+	sessionPubKey := sessionPrivKey.PublicKey().Bytes()
 
-	signedSessionPubKey, err := peerPrivKey.Sign(sessionPubKey.Bytes())
+	signedSessionPubKey, err := peerPrivKey.Sign(sessionPubKey)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	return sessionPrivKey, sessionPubKey, signedSessionPubKey, nil
+	keys, err := json.Marshal(sessionPubKeys{
+		PubKey:       sessionPubKey,
+		SignedPubKey: signedSessionPubKey,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	keys = append(keys, '\n')
+
+	return sessionPrivKey, keys, nil
 }
 
-// VerifySessionPubKey verifies that "signature" was signed via sender's private peer id
-func VerifySessionPubKey(senderPubKey crypto.PubKey, sessionPubBytes []byte, signature []byte) error {
-	valid, err := senderPubKey.Verify(sessionPubBytes, signature)
+// VerifySessionPubKey verifies that "signedSessionPubBytes" was signed via sender's private peer id
+func VerifySessionPubKey(senderPubKey crypto.PubKey, keysBytes []byte) ([]byte, error) {
+	var keys sessionPubKeys
+
+	err := json.Unmarshal(keysBytes, &keys)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	valid, err := senderPubKey.Verify(keys.PubKey, keys.SignedPubKey)
+	if err != nil {
+		return nil, err
 	}
 
 	if !valid {
-		return errors.New("Invalid session key signature!")
+		return nil, errors.New("Invalid session key signature!")
 	}
 
-	return nil
+	return keys.PubKey, nil
 }
 
 // ComputeSharedSecret computes Diffie-Hellman shared secret
@@ -109,7 +133,7 @@ func DecryptMessage(aesKey, ciphertext []byte) ([]byte, error) {
 
 	nonceSize := gcm.NonceSize()
 	if len(ciphertext) < nonceSize {
-		return nil, errors.New("Invalid ciphertext size!")
+		return nil, fmt.Errorf("ciphertext too short")
 	}
 
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]

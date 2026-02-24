@@ -32,16 +32,26 @@ func commandHandler(ctx context.Context, localPeer *peer.Peer, command []string)
 			return err
 		}
 
+		fmt.Println("Connected!")
+
 		go chat.ShowChat(localPeer)
-		localPeer.WriteToStream(s.Stream, utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), " joined the chat\n"))
+
+		err = localPeer.WriteToStream(s.Stream, utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), " joined the chat\n"))
+		if err != nil {
+			return err
+		}
 	case "/back":
 		if peerID := localPeer.ActivePeerID.Load().(string); peerID != "" {
-			s := localPeer.CheckStream(ctx, peerID)
+			s := localPeer.CheckStream(peerID)
 			if s == nil {
 				return errors.New("commandHandler: stream doesn't exist")
 			}
 
-			localPeer.WriteToStream(s.Stream, utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), " leaved the chat\n"))
+			err := localPeer.WriteToStream(s.Stream, utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), " leaved the chat\n"))
+			if err != nil {
+				return err
+			}
+
 			return errors.New("Leaving chat ...")
 		} else {
 			fmt.Println("Press Ctrl+C to exit")
@@ -65,7 +75,7 @@ func inputHandler(ctx context.Context, localPeer *peer.Peer, rawInput string) er
 		return nil
 	}
 
-	s := localPeer.CheckStream(ctx, localPeer.ActivePeerID.Load().(string))
+	s := localPeer.CheckStream(localPeer.ActivePeerID.Load().(string))
 	if s == nil {
 		return errors.New("inputHandler: stream doesn't exist")
 	}

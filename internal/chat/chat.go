@@ -11,7 +11,7 @@ func ShowChat(localPeer *peer.Peer) {
 
 	localPeer.ChatsMut.RLock()
 
-	snapshot := append([]peer.Mssg(nil), localPeer.Chats[localPeer.ActivePeerID.Load().(string)]...)
+	snapshot := append([]peer.Mssg{}, localPeer.Chats[localPeer.ActivePeerID.Load().(string)]...)
 	lastPrinted := len(snapshot)
 
 	localPeer.ChatsMut.RUnlock()
@@ -31,7 +31,7 @@ func ShowChat(localPeer *peer.Peer) {
 
 		localPeer.ChatsMut.RLock()
 
-		unreadedMessages := append([]peer.Mssg(nil), localPeer.Chats[activePeerID][lastPrinted:]...)
+		unreadedMessages := append([]peer.Mssg{}, localPeer.Chats[activePeerID][lastPrinted:]...)
 		lastPrinted = len(localPeer.Chats[activePeerID])
 
 		localPeer.ChatsMut.RUnlock()

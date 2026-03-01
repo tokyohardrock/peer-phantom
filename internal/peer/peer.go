@@ -170,6 +170,13 @@ func (P *Peer) getKeyToStream(remotePeerID peer.ID, info []byte) ([]byte, error)
 		return nil, fmt.Errorf("%s during deriving AES key: %w", fn, err)
 	}
 
+	P.StreamsMut.Lock()
+	stream := P.Streams[remotePeerID.String()]
+	copy(stream.Key, key)
+	P.StreamsMut.Unlock()
+
+	stream.isInit <- struct{}{}
+
 	return key, nil
 }
 
@@ -182,13 +189,13 @@ func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
 	var key []byte
 
 	for {
-		rawMessage, err := reader.ReadBytes('\n')
+		rawMessage, err := utils.ReadMessageWithLengthPrefix(reader)
 		if err != nil {
-			log.Error(fmt.Sprintf("%s during reading from stream: %v", fn, err))
+			log.Error(fmt.Sprintf("%s during reading message with prefix: %v", fn, err))
 			return
 		}
 
-		if len(rawMessage) == 0 {
+		if len(rawMessage) < 2 {
 			log.Error(fmt.Sprintf("%s: empty message received", fn))
 			continue
 		}
@@ -200,17 +207,10 @@ func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
 				return
 			}
 
-			P.StreamsMut.Lock()
-			stream := P.Streams[remotePeerID.String()]
-			copy(stream.Key, key)
-			P.StreamsMut.Unlock()
-
-			stream.isInit <- struct{}{}
-
 			continue
 		}
 
-		message, err := e2ee.DecryptMessage(key, rawMessage[:len(rawMessage)-1])
+		message, err := e2ee.DecryptMessage(key, rawMessage)
 		if err != nil {
 			log.Error(fmt.Sprintf("%s during decrypting message: %v", fn, err))
 			return
@@ -246,11 +246,9 @@ func (P *Peer) WriteToStream(s network.Stream, rawMessage string) error {
 		return fmt.Errorf("%s during encrypting message: %w", fn, err)
 	}
 
-	message = append(message, '\n')
-
-	_, err = s.Write(message)
+	_, err = s.Write(utils.AddLengthPrefixToMessage(message))
 	if err != nil {
-		return fmt.Errorf("%s during writing to stream: %w", fn, err)
+		return fmt.Errorf("%s during writing message to stream: %w", fn, err)
 	}
 
 	P.UpdateChatHistory(remotePeerID,
@@ -297,7 +295,7 @@ func (P *Peer) streamsHandler(log *slog.Logger, s network.Stream) (*SafeStream, 
 	P.Streams[s.Conn().RemotePeer().String()] = stream
 	P.StreamsMut.Unlock()
 
-	_, err := s.Write(P.SessionPubKeys)
+	_, err := s.Write(utils.AddLengthPrefixToMessage(P.SessionPubKeys))
 	if err != nil {
 		return nil, fmt.Errorf("%s during writing session public keys to stream: %w", fn, err)
 	}

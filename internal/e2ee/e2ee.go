@@ -45,8 +45,6 @@ func GenerateSessionKeys(peerPrivKey crypto.PrivKey) (*ecdh.PrivateKey, []byte, 
 		return nil, nil, fmt.Errorf("%s: failed to marshal session keys: %w", fn, err)
 	}
 
-	keys = append(keys, '\n')
-
 	return sessionPrivKey, keys, nil
 }
 

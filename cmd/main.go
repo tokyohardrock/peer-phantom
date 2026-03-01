@@ -18,7 +18,6 @@ func main() {
 	go gracefulShutdown(sigChan)
 
 	log := logger.InitLogger()
-	log.Debug("Logger is init successfully!")
 
 	var host peer.Peer
 

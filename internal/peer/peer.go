@@ -1,12 +1,11 @@
 package peer
 
 import (
+	"bufio"
 	"context"
 	"crypto/ecdh"
-	"encoding/binary"
-	"errors"
 	"fmt"
-	"io"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 
@@ -57,10 +56,12 @@ type Peer struct {
 	NewMessage chan struct{}
 }
 
-func (P *Peer) Init() error {
+func (P *Peer) Init(log *slog.Logger) error {
+	const fn = "peer.Init"
+
 	privKey, err := loadPrivateKey(KEY_FILE)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s during loading private key: %w", fn, err)
 	}
 
 	host, err := libp2p.New(
@@ -70,7 +71,7 @@ func (P *Peer) Init() error {
 		libp2p.Identity(privKey),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s during creating libp2p host: %w", fn, err)
 	}
 
 	P.Host = host
@@ -85,11 +86,11 @@ func (P *Peer) Init() error {
 
 	P.SessionPrivKey, P.SessionPubKeys, err = e2ee.GenerateSessionKeys(privKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s during generating session keys: %w", fn, err)
 	}
 
 	host.SetStreamHandler(PROTOCOL, func(s network.Stream) {
-		_, err := P.streamsHandler(s)
+		_, err := P.streamsHandler(log, s)
 		if err != nil {
 			fmt.Println("Errot during handling incoming stream: ", err)
 		}
@@ -99,19 +100,21 @@ func (P *Peer) Init() error {
 }
 
 func (P *Peer) ConnectToPeer(ctx context.Context, maddrStr string) (*peer.AddrInfo, error) {
+	const fn = "peer.ConnectToPeer"
+
 	maddr, err := multiaddr.NewMultiaddr(maddrStr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s during parsing multiaddress: %w", fn, err)
 	}
 
 	info, err := peer.AddrInfoFromP2pAddr(maddr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s during extracting peer info from multiaddress: %w", fn, err)
 	}
 
 	err = P.Host.Connect(ctx, *info)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s during connecting to peer: %w", fn, err)
 	}
 
 	return info, nil
@@ -125,17 +128,19 @@ func (P *Peer) CheckStream(info string) *SafeStream {
 	return stream
 }
 
-func (P *Peer) GetStreamToPeer(ctx context.Context, info peer.ID) (*SafeStream, error) {
+func (P *Peer) GetStreamToPeer(ctx context.Context, log *slog.Logger, info peer.ID) (*SafeStream, error) {
+	const fn = "peer.GetStreamToPeer"
+
 	stream := P.CheckStream(info.String())
 	if stream == nil {
 		s, err := P.Host.NewStream(ctx, info, PROTOCOL)
 		if err != nil {
-			return nil, errors.New("GetStreamToPeer during creating new stream: " + err.Error())
+			return nil, fmt.Errorf("%s during creating new stream: %w", fn, err)
 		}
 
-		stream, err = P.streamsHandler(s)
+		stream, err = P.streamsHandler(log, s)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s during handling stream: %w", fn, err)
 		}
 	}
 
@@ -143,53 +148,55 @@ func (P *Peer) GetStreamToPeer(ctx context.Context, info peer.ID) (*SafeStream, 
 }
 
 func (P *Peer) getKeyToStream(remotePeerID peer.ID, info []byte) ([]byte, error) {
+	const fn = "peer.getKeyToStream"
+
 	remotePubKey, err := remotePeerID.ExtractPublicKey()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s during extracting public key from peer ID: %w", fn, err)
 	}
 
 	remoteSessionPub, err := e2ee.VerifySessionPubKey(remotePubKey, info)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s during verifying session public key: %w", fn, err)
 	}
 
 	secret, err := e2ee.ComputeSharedSecret(P.SessionPrivKey, remoteSessionPub)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s during computing shared secret: %w", fn, err)
 	}
 
 	key, err := e2ee.DeriveAESKey(secret)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s during deriving AES key: %w", fn, err)
 	}
 
 	return key, nil
 }
 
-func (P *Peer) ReadFromStream(s network.Stream) {
+func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
+	const fn = "peer.ReadFromStream"
+
 	remotePeerID := s.Conn().RemotePeer()
+	reader := bufio.NewReader(s)
 
 	var key []byte
-	var size uint32
 
 	for {
-		err := binary.Read(s, binary.BigEndian, &size)
+		rawMessage, err := reader.ReadBytes('\n')
 		if err != nil {
-			fmt.Println(err)
+			log.Error(fmt.Sprintf("%s during reading from stream: %v", fn, err))
 			return
 		}
 
-		rawMessage := make([]byte, size)
-		_, err = io.ReadFull(s, rawMessage)
-		if err != nil {
-			fmt.Println(err)
-			return
+		if len(rawMessage) == 0 {
+			log.Error(fmt.Sprintf("%s: empty message received", fn))
+			continue
 		}
 
 		if len(key) == 0 {
 			key, err = P.getKeyToStream(remotePeerID, rawMessage)
 			if err != nil {
-				fmt.Println(err)
+				log.Error(fmt.Sprintf("%s during getting key to stream: %v", fn, err))
 				return
 			}
 
@@ -203,9 +210,9 @@ func (P *Peer) ReadFromStream(s network.Stream) {
 			continue
 		}
 
-		message, err := e2ee.DecryptMessage(key, rawMessage)
+		message, err := e2ee.DecryptMessage(key, rawMessage[:len(rawMessage)-1])
 		if err != nil {
-			fmt.Println(err)
+			log.Error(fmt.Sprintf("%s during decrypting message: %v", fn, err))
 			return
 		}
 
@@ -219,6 +226,8 @@ func (P *Peer) ReadFromStream(s network.Stream) {
 }
 
 func (P *Peer) WriteToStream(s network.Stream, rawMessage string) error {
+	const fn = "peer.WriteToStream"
+
 	remotePeerID := s.Conn().RemotePeer().String()
 	key := make([]byte, 32)
 
@@ -234,14 +243,14 @@ func (P *Peer) WriteToStream(s network.Stream, rawMessage string) error {
 
 	message, err := e2ee.EncryptMessage(key, []byte(rawMessage))
 	if err != nil {
-		return err
+		return fmt.Errorf("%s during encrypting message: %w", fn, err)
 	}
 
-	binary.Write(s, binary.BigEndian, uint32(len(message)))
+	message = append(message, '\n')
 
 	_, err = s.Write(message)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s during writing to stream: %w", fn, err)
 	}
 
 	P.UpdateChatHistory(remotePeerID,
@@ -275,7 +284,9 @@ func (P *Peer) UpdateChatHistory(remotePeerID string, message Mssg) {
 	}
 }
 
-func (P *Peer) streamsHandler(s network.Stream) (*SafeStream, error) {
+func (P *Peer) streamsHandler(log *slog.Logger, s network.Stream) (*SafeStream, error) {
+	const fn = "peer.streamsHandler"
+
 	stream := &SafeStream{
 		Stream: s,
 		Key:    make([]byte, 32),
@@ -288,10 +299,10 @@ func (P *Peer) streamsHandler(s network.Stream) (*SafeStream, error) {
 
 	_, err := s.Write(P.SessionPubKeys)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s during writing session public keys to stream: %w", fn, err)
 	}
 
-	go P.ReadFromStream(s)
+	go P.ReadFromStream(log, s)
 
 	return stream, nil
 }

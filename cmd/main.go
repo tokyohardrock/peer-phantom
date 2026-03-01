@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"peer-phantom/internal/input"
+	"peer-phantom/internal/logger"
 	"peer-phantom/internal/peer"
 )
 
@@ -17,14 +17,18 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	go gracefulShutdown(sigChan)
 
+	log := logger.InitLogger()
+	log.Debug("Logger is init successfully!")
+
 	var host peer.Peer
 
-	err := host.Init()
+	err := host.Init(log)
 	if err != nil {
-		log.Fatal("Unable to initialize peer: ", err)
+		log.Error(err.Error())
+		os.Exit(1)
 	}
 
-	input.ListenStdin(ctx, &host)
+	input.ListenStdin(ctx, log, &host)
 }
 
 func gracefulShutdown(sigChan chan os.Signal) {

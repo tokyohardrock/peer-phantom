@@ -1,43 +1,46 @@
 package chat
 
 import (
+	"context"
 	"fmt"
 	"peer-phantom/internal/peer"
-	_ "peer-phantom/internal/terminal"
 )
 
-func ShowChat(localPeer *peer.Peer) {
-	//terminal.Clear()
+func ShowChat(ctx context.Context, localPeer *peer.Peer) {
+	activeID := localPeer.ActivePeerID.Load().(string)
 
 	localPeer.ChatsMut.RLock()
-
-	snapshot := append([]peer.Mssg{}, localPeer.Chats[localPeer.ActivePeerID.Load().(string)]...)
-	lastPrinted := len(snapshot)
-
-	localPeer.ChatsMut.RUnlock()
-
-	for i := range snapshot {
-		fmt.Print(snapshot[i].Message)
+	chat := localPeer.Chats[activeID]
+	for i := range chat {
+		fmt.Print(chat[i].Message)
 	}
 
+	lastPrinted := len(chat)
+	localPeer.ChatsMut.RUnlock()
+
 	for {
-		<-localPeer.NewMessage
-
-		activePeerID := localPeer.ActivePeerID.Load().(string)
-
-		if activePeerID == "" {
+		select {
+		case <-ctx.Done():
 			return
-		}
+		case <-localPeer.NewMessage:
+			activeID := localPeer.ActivePeerID.Load().(string)
+			if activeID == "" {
+				return
+			}
 
-		localPeer.ChatsMut.RLock()
+			localPeer.ChatsMut.RLock()
+			chatHistory := localPeer.Chats[activeID]
 
-		unreadedMessages := append([]peer.Mssg{}, localPeer.Chats[activePeerID][lastPrinted:]...)
-		lastPrinted = len(localPeer.Chats[activePeerID])
+			if len(chatHistory) > lastPrinted {
+				unread := chatHistory[lastPrinted:]
 
-		localPeer.ChatsMut.RUnlock()
+				for i := range unread {
+					fmt.Print(unread[i].Message)
+				}
 
-		for i := range unreadedMessages {
-			fmt.Print(unreadedMessages[i].Message)
+				lastPrinted = len(chatHistory)
+			}
+			localPeer.ChatsMut.RUnlock()
 		}
 	}
 }

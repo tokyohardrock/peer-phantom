@@ -13,7 +13,9 @@ import (
 	"strings"
 )
 
-func commandHandler(ctx context.Context, log *slog.Logger, localPeer *peer.Peer, command []string) error {
+var leftChatErr = errors.New("left the chat")
+
+func commandHandler(ctx context.Context, log *slog.Logger, localPeer *peer.Peer, command []string, cancelChat *context.CancelFunc) error {
 	const fn = "input.commandHandler"
 
 	switch command[0] {
@@ -37,7 +39,10 @@ func commandHandler(ctx context.Context, log *slog.Logger, localPeer *peer.Peer,
 
 		fmt.Println("Connected!")
 
-		go chat.ShowChat(localPeer)
+		chatCtx, cancel := context.WithCancel(ctx)
+		*cancelChat = cancel
+
+		go chat.ShowChat(chatCtx, localPeer)
 
 		err = localPeer.WriteToStream(s.Stream, utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), " joined the chat\n"))
 		if err != nil {
@@ -50,14 +55,16 @@ func commandHandler(ctx context.Context, log *slog.Logger, localPeer *peer.Peer,
 				return fmt.Errorf("%s: no active stream to send leave message", fn)
 			}
 
+			localPeer.ActivePeerID.Store("")
+
 			err := localPeer.WriteToStream(s.Stream, utils.ConcatenateStrings(utils.GetShortPeerID(localPeer.MyPeerID), " leaved the chat\n"))
 			if err != nil {
 				return fmt.Errorf("%s: failed to write to stream: %w", fn, err)
 			}
 
-			return errors.New("left the chat")
+			return leftChatErr
 		} else {
-			fmt.Println("Press Ctrl+C to exit")
+			fmt.Println("You are not in a chat!")
 		}
 	default:
 		fmt.Println("Unknown command!")
@@ -66,13 +73,13 @@ func commandHandler(ctx context.Context, log *slog.Logger, localPeer *peer.Peer,
 	return nil
 }
 
-func inputHandler(ctx context.Context, log *slog.Logger, localPeer *peer.Peer, rawInput string) error {
+func inputHandler(ctx context.Context, log *slog.Logger, localPeer *peer.Peer, rawInput string, cancelChat *context.CancelFunc) error {
 	const fn = "input.inputHandler"
 
 	words := strings.Fields(rawInput)
 
 	if len(words) > 0 && rawInput[0] == '/' {
-		err := commandHandler(ctx, log, localPeer, words)
+		err := commandHandler(ctx, log, localPeer, words, cancelChat)
 		if err != nil {
 			return fmt.Errorf("%s: %w", fn, err)
 		}
@@ -93,11 +100,9 @@ func inputHandler(ctx context.Context, log *slog.Logger, localPeer *peer.Peer, r
 func ListenStdin(ctx context.Context, log *slog.Logger, localPeer *peer.Peer) {
 	reader := bufio.NewReader(os.Stdin)
 
+	var cancelChat context.CancelFunc
+
 	for {
-		localPeer.ActivePeerID.Store("")
-
-		// terminal.Clear()
-
 		fmt.Println("-=] Peer Phantom [=-")
 		fmt.Println("Your addresses:")
 		for i, addr := range localPeer.Host.Addrs() {
@@ -116,8 +121,16 @@ func ListenStdin(ctx context.Context, log *slog.Logger, localPeer *peer.Peer) {
 				continue
 			}
 
-			err = inputHandler(ctx, log, localPeer, input)
+			err = inputHandler(ctx, log, localPeer, input, &cancelChat)
 			if err != nil {
+				if errors.Is(err, leftChatErr) {
+					if cancelChat != nil {
+						cancelChat()
+						cancelChat = nil
+					}
+					break
+				}
+
 				log.Error(err.Error())
 				break
 			}

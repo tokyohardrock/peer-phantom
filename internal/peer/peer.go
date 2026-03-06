@@ -218,7 +218,7 @@ func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
 
 		P.UpdateChatHistory(remotePeerID.String(),
 			Mssg{
-				Author:  utils.GetShortPeerID(remotePeerID.String()),
+				Author:  remotePeerID.String(),
 				Message: string(message),
 			},
 		)

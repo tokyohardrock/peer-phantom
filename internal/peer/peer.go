@@ -66,7 +66,7 @@ func (P *Peer) Init(log *slog.Logger) error {
 
 	host, err := libp2p.New(
 		libp2p.ListenAddrStrings(
-			"/ip4/0.0.0.0/tcp/0",
+			"/ip4/0.0.0.0/tcp/4001",
 		), // listen on all IPv4 addresses over TCP on a random port
 		libp2p.Identity(privKey),
 	)

@@ -105,8 +105,13 @@ func ListenStdin(ctx context.Context, log *slog.Logger, localPeer *peer.Peer) {
 	for {
 		fmt.Println("-=] Peer Phantom [=-")
 		fmt.Println("Your addresses:")
-		for i, addr := range localPeer.Host.Addrs() {
-			fmt.Printf("%d. %s/p2p/%s\n", i+1, addr, localPeer.MyPeerID)
+		for _, addr := range localPeer.Host.Addrs() {
+			s := addr.String()
+			if strings.Contains(s, "/ip4/127.0.0.1/") || strings.Contains(s, "/ip6/::1/") {
+				continue
+			}
+
+			fmt.Printf("%s/p2p/%s\n", addr, localPeer.MyPeerID)
 		}
 		fmt.Println()
 

@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	ctx := context.TODO()
+	ctx := context.Background()
 
 	sigChan := make(chan os.Signal, 1)
 	go gracefulShutdown(sigChan)

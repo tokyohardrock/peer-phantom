@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 
@@ -24,6 +25,7 @@ import (
 const (
 	PROTOCOL = "/peer-phantom/1.0.0"
 	KEY_FILE = "key" // the name of the file that will contain the identifier
+	Timeout  = 5
 )
 
 type Mssg struct {
@@ -102,6 +104,9 @@ func (P *Peer) Init(log *slog.Logger) error {
 func (P *Peer) ConnectToPeer(ctx context.Context, maddrStr string) (*peer.AddrInfo, error) {
 	const fn = "peer.ConnectToPeer"
 
+	ctx, cancel := context.WithTimeout(ctx, Timeout*time.Second)
+	defer cancel()
+
 	maddr, err := multiaddr.NewMultiaddr(maddrStr)
 	if err != nil {
 		return nil, fmt.Errorf("%s during parsing multiaddress: %w", fn, err)
@@ -130,6 +135,9 @@ func (P *Peer) CheckStream(info string) *SafeStream {
 
 func (P *Peer) GetStreamToPeer(ctx context.Context, log *slog.Logger, info peer.ID) (*SafeStream, error) {
 	const fn = "peer.GetStreamToPeer"
+
+	ctx, cancel := context.WithTimeout(ctx, Timeout*time.Second)
+	defer cancel()
 
 	stream := P.CheckStream(info.String())
 	if stream == nil {

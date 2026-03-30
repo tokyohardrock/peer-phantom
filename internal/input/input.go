@@ -15,7 +15,7 @@ import (
 
 var leftChatErr = errors.New("left the chat")
 
-func commandHandler(ctx context.Context, log *slog.Logger, localPeer *peer.Peer, command []string, cancelChat *context.CancelFunc) error {
+func commandHandler(ctx context.Context, cancelChat *context.CancelFunc, log *slog.Logger, localPeer *peer.Peer, command []string) error {
 	const fn = "input.commandHandler"
 
 	switch command[0] {
@@ -73,13 +73,13 @@ func commandHandler(ctx context.Context, log *slog.Logger, localPeer *peer.Peer,
 	return nil
 }
 
-func inputHandler(ctx context.Context, log *slog.Logger, localPeer *peer.Peer, rawInput string, cancelChat *context.CancelFunc) error {
+func inputHandler(ctx context.Context, cancelChat *context.CancelFunc, log *slog.Logger, localPeer *peer.Peer, rawInput string) error {
 	const fn = "input.inputHandler"
 
 	words := strings.Fields(rawInput)
 
 	if len(words) > 0 && rawInput[0] == '/' {
-		err := commandHandler(ctx, log, localPeer, words, cancelChat)
+		err := commandHandler(ctx, cancelChat, log, localPeer, words)
 		if err != nil {
 			return fmt.Errorf("%s: %w", fn, err)
 		}
@@ -126,7 +126,7 @@ func ListenStdin(ctx context.Context, log *slog.Logger, localPeer *peer.Peer) {
 				continue
 			}
 
-			err = inputHandler(ctx, log, localPeer, input, &cancelChat)
+			err = inputHandler(ctx, &cancelChat, log, localPeer, input)
 			if err != nil {
 				if errors.Is(err, leftChatErr) {
 					if cancelChat != nil {

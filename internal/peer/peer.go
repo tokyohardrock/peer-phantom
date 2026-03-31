@@ -6,6 +6,7 @@ import (
 	"crypto/ecdh"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -61,16 +62,47 @@ type Peer struct {
 func (P *Peer) Init(log *slog.Logger) error {
 	const fn = "peer.Init"
 
+	advertiseIP := os.Getenv("ADVERTISE_IP")
+	if advertiseIP == "" {
+		return fmt.Errorf("%s: ADVERTISE_IP is empty", fn)
+	}
+
 	privKey, err := loadPrivateKey(KEY_FILE)
 	if err != nil {
 		return fmt.Errorf("%s during loading private key: %w", fn, err)
 	}
 
 	host, err := libp2p.New(
-		libp2p.ListenAddrStrings(
-			"/ip4/0.0.0.0/tcp/4001",
-		), // listen on all IPv4 addresses over TCP on port 4001
+		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/4001"), // listen on all IPv4 addresses over TCP on port 4001
 		libp2p.Identity(privKey),
+		libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+			res := make([]multiaddr.Multiaddr, 0, len(addrs))
+
+			for _, addr := range addrs {
+				port, err := addr.ValueForProtocol(multiaddr.P_TCP) // gets port from local multiaddress (4001)
+				if err != nil {
+					log.Error(
+						fmt.Sprintf("%s something went wrong during port pasring: %w", fn, err),
+					)
+					continue
+				}
+
+				publicAddr, err := multiaddr.NewMultiaddr(
+					fmt.Sprintf("/ip4/%s/tcp/%s", advertiseIP, port),
+				)
+				if err != nil {
+					log.Error(
+						fmt.Sprintf("%s something went wrong during new multiaddress validation: %w", fn, err),
+					)
+					continue
+				}
+
+				res = append(res, publicAddr)
+			}
+
+			return res
+		}),
+		libp2p.DisableIdentifyAddressDiscovery(),
 	)
 	if err != nil {
 		return fmt.Errorf("%s during creating libp2p host: %w", fn, err)
@@ -199,19 +231,25 @@ func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
 	for {
 		rawMessage, err := utils.ReadMessageWithLengthPrefix(reader)
 		if err != nil {
-			log.Error(fmt.Sprintf("%s during reading message with prefix: %v", fn, err))
+			log.Error(
+				fmt.Sprintf("%s during reading message with prefix: %v", fn, err),
+			)
 			return
 		}
 
 		if len(rawMessage) < 2 {
-			log.Error(fmt.Sprintf("%s: empty message received", fn))
+			log.Error(
+				fmt.Sprintf("%s: empty message received", fn),
+			)
 			continue
 		}
 
 		if len(key) == 0 {
 			key, err = P.getKeyToStream(remotePeerID, rawMessage)
 			if err != nil {
-				log.Error(fmt.Sprintf("%s during getting key to stream: %v", fn, err))
+				log.Error(
+					fmt.Sprintf("%s during getting key to stream: %v", fn, err),
+				)
 				return
 			}
 
@@ -220,7 +258,9 @@ func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
 
 		message, err := e2ee.DecryptMessage(key, rawMessage)
 		if err != nil {
-			log.Error(fmt.Sprintf("%s during decrypting message: %v", fn, err))
+			log.Error(
+				fmt.Sprintf("%s during decrypting message: %v", fn, err),
+			)
 			return
 		}
 

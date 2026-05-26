@@ -311,12 +311,13 @@ func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
 			return
 		}
 
-		P.UpdateChatHistory(remotePeerID.String(),
-			Mssg{
-				Author:  remotePeerID.String(),
-				Message: string(message),
-			},
-		)
+		err = P.UpdateChatHistory(remoteUser.String(), remoteUser.String(), string(message))
+		if err != nil {
+			log.Error(
+				fmt.Sprintf("%s: during updating chat history %w", fn, err),
+			)
+			continue
+		}
 	}
 }
 
@@ -346,35 +347,34 @@ func (P *Peer) WriteToStream(s network.Stream, rawMessage string) error {
 		return fmt.Errorf("%s during writing message to stream: %w", fn, err)
 	}
 
-	P.UpdateChatHistory(remotePeerID,
-		Mssg{
-			Author:  P.MyPeerID,
-			Message: rawMessage,
-		},
-	)
+	err = P.UpdateChatHistory(remoteUser, P.MyPeerID, rawMessage)
+	if err != nil {
+		return fmt.Errorf("%s during updating chat history: %w", fn, err)
+	}
 
 	return nil
 }
 
-func (P *Peer) UpdateChatHistory(remotePeerID string, message Mssg) {
-	P.ChatsMut.Lock()
+func (P *Peer) UpdateChatHistory(remoteUser string, author string, message string) error {
+	const fn = "peer.UpdateChatHistory"
 
-	if P.Chats[remotePeerID] == nil {
-		P.Chats[remotePeerID] = make([]Mssg, 0, 100)
+	chat, err := P.Chats.GetChat(remoteUser)
+	if err != nil && !errors.Is(err, defs.ErrorNoChat) {
+		return fmt.Errorf("%s: %w", fn, err)
 	}
 
-	P.Chats[remotePeerID] = append(P.Chats[remotePeerID], message)
-
-	P.ChatsMut.Unlock()
-
-	if remotePeerID != P.ActivePeerID.Load().(string) {
-		return
+	if err != nil {
+		chat = P.Chats.AddChat(remoteUser)
 	}
 
-	select {
-	case P.NewMessage <- struct{}{}:
-	default:
+	chat.AppendMessage(author, message)
+	if author != P.MyPeerID {
+		chat.NewMessage()
 	}
+
+	P.Broker.UpdateOnFront <- chat
+
+	return nil
 }
 
 func (P *Peer) streamsHandler(log *slog.Logger, s network.Stream) (*SafeStream, error) {

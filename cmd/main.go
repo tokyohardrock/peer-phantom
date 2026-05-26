@@ -6,9 +6,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"peer-phantom/internal/input"
+	"peer-phantom/internal/defs"
 	"peer-phantom/internal/logger"
 	"peer-phantom/internal/peer"
+	"peer-phantom/internal/tui"
 )
 
 func main() {
@@ -19,15 +20,22 @@ func main() {
 
 	log := logger.InitLogger()
 
+	chats := defs.InitChatStorage()
+	broker := defs.InitBroker()
+
 	var host peer.Peer
 
-	err := host.Init(log)
+	err := host.Init(ctx, log, chats, broker)
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
 
-	input.ListenStdin(ctx, log, &host)
+	err = tui.Run(chats, broker)
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(1)
+	}
 }
 
 func gracefulShutdown(sigChan chan os.Signal) {

@@ -28,13 +28,8 @@ import (
 const (
 	PROTOCOL = "/peer-phantom/1.0.0"
 	KEY_FILE = "key" // the name of the file that will contain the identifier
-	Timeout  = 5
+	TIMEOUT  = 5
 )
-
-type Mssg struct {
-	Author  string
-	Message string
-}
 
 type SafeStream struct {
 	Stream network.Stream

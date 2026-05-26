@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"context"
 	"crypto/ecdh"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -19,6 +20,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
+	"peer-phantom/internal/defs"
 	"peer-phantom/internal/e2ee"
 	"peer-phantom/internal/utils"
 )

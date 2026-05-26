@@ -183,7 +183,7 @@ func (P *Peer) Init(ctx context.Context, log *slog.Logger, chats defs.ChatStorag
 func (P *Peer) ConnectToPeer(ctx context.Context, maddrStr string) (*peer.AddrInfo, error) {
 	const fn = "peer.ConnectToPeer"
 
-	ctx, cancel := context.WithTimeout(ctx, Timeout*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, TIMEOUT*time.Second)
 	defer cancel()
 
 	maddr, err := multiaddr.NewMultiaddr(maddrStr)
@@ -215,7 +215,7 @@ func (P *Peer) CheckStream(info string) *SafeStream {
 func (P *Peer) GetStreamToPeer(ctx context.Context, log *slog.Logger, info peer.ID) (*SafeStream, error) {
 	const fn = "peer.GetStreamToPeer"
 
-	ctx, cancel := context.WithTimeout(ctx, Timeout*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, TIMEOUT*time.Second)
 	defer cancel()
 
 	stream := P.CheckStream(info.String())
@@ -234,10 +234,10 @@ func (P *Peer) GetStreamToPeer(ctx context.Context, log *slog.Logger, info peer.
 	return stream, nil
 }
 
-func (P *Peer) getKeyToStream(remotePeerID peer.ID, info []byte) ([]byte, error) {
+func (P *Peer) getKeyToStream(remoteUser peer.ID, info []byte) ([]byte, error) {
 	const fn = "peer.getKeyToStream"
 
-	remotePubKey, err := remotePeerID.ExtractPublicKey()
+	remotePubKey, err := remoteUser.ExtractPublicKey()
 	if err != nil {
 		return nil, fmt.Errorf("%s during extracting public key from peer ID: %w", fn, err)
 	}
@@ -258,7 +258,7 @@ func (P *Peer) getKeyToStream(remotePeerID peer.ID, info []byte) ([]byte, error)
 	}
 
 	P.StreamsMut.Lock()
-	stream := P.Streams[remotePeerID.String()]
+	stream := P.Streams[remoteUser.String()]
 	copy(stream.Key, key)
 	P.StreamsMut.Unlock()
 
@@ -267,10 +267,10 @@ func (P *Peer) getKeyToStream(remotePeerID peer.ID, info []byte) ([]byte, error)
 	return key, nil
 }
 
-func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
+func (P *Peer) readFromStream(log *slog.Logger, s network.Stream) {
 	const fn = "peer.ReadFromStream"
 
-	remotePeerID := s.Conn().RemotePeer()
+	remoteUser := s.Conn().RemotePeer()
 	reader := bufio.NewReader(s)
 
 	var key []byte
@@ -284,7 +284,7 @@ func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
 			return
 		}
 
-		if len(rawMessage) < 2 {
+		if len(rawMessage) == 0 {
 			log.Error(
 				fmt.Sprintf("%s: empty message received", fn),
 			)
@@ -292,14 +292,13 @@ func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
 		}
 
 		if len(key) == 0 {
-			key, err = P.getKeyToStream(remotePeerID, rawMessage)
+			key, err = P.getKeyToStream(remoteUser, rawMessage)
 			if err != nil {
 				log.Error(
 					fmt.Sprintf("%s during getting key to stream: %v", fn, err),
 				)
 				return
 			}
-
 			continue
 		}
 
@@ -308,7 +307,7 @@ func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
 			log.Error(
 				fmt.Sprintf("%s during decrypting message: %v", fn, err),
 			)
-			return
+			continue
 		}
 
 		err = P.UpdateChatHistory(remoteUser.String(), remoteUser.String(), string(message))
@@ -324,10 +323,10 @@ func (P *Peer) ReadFromStream(log *slog.Logger, s network.Stream) {
 func (P *Peer) WriteToStream(s network.Stream, rawMessage string) error {
 	const fn = "peer.WriteToStream"
 
-	remotePeerID := s.Conn().RemotePeer().String()
+	remoteUser := s.Conn().RemotePeer().String()
 	key := make([]byte, 32)
 
-	stream := P.Streams[remotePeerID]
+	stream := P.Streams[remoteUser]
 	_, ok := <-stream.isInit
 	if ok {
 		close(stream.isInit)
@@ -395,7 +394,7 @@ func (P *Peer) streamsHandler(log *slog.Logger, s network.Stream) (*SafeStream, 
 		return nil, fmt.Errorf("%s during writing session public keys to stream: %w", fn, err)
 	}
 
-	go P.ReadFromStream(log, s)
+	go P.readFromStream(log, s)
 
 	return stream, nil
 }

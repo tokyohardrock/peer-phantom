@@ -48,13 +48,65 @@ type Peer struct {
 	Streams    map[string]*SafeStream
 	StreamsMut sync.RWMutex
 
-	Chats    map[string][]Mssg
-	ChatsMut sync.RWMutex
-
-	NewMessage chan struct{}
+	Chats  defs.ChatStorage
+	Broker defs.Broker
 }
 
-func (P *Peer) Init(log *slog.Logger) error {
+func (P *Peer) readBroker(ctx context.Context, log *slog.Logger) {
+	const fn = "peer.readBroker"
+
+	for {
+		chat, ok := <-P.Broker.UpdateOnBack
+		if !ok {
+			log.Error(
+				fmt.Sprintf("%s: broker chan is closed", fn),
+			)
+			return
+		}
+
+		info, err := P.ConnectToPeer(ctx, chat.GetRemoteUser())
+		if err != nil {
+			log.Error(
+				fmt.Sprintf("%s: during connecting to peer %w", fn, err),
+			)
+			continue
+		}
+
+		s, err := P.GetStreamToPeer(ctx, log, info.ID)
+		if err != nil {
+			log.Error(
+				fmt.Sprintf("%s: during getting stream to peer %w", fn, err),
+			)
+			continue
+		}
+
+		chat.Mutex.Lock()
+
+		for _, msg := range slices.Backward(chat.Messages) {
+			if msg.Status == defs.Sent {
+				break
+			}
+
+			if msg.Status == defs.Pending {
+				err = P.WriteToStream(s.Stream, "")
+				if err != nil {
+					log.Error(
+						fmt.Sprintf("%s: during writing to stream %w", fn, err),
+					)
+
+					msg.Status = defs.Error
+					continue
+				}
+
+				msg.Status = defs.Sent
+			}
+		}
+
+		chat.Mutex.Unlock()
+	}
+}
+
+func (P *Peer) Init(ctx context.Context, log *slog.Logger, chats defs.ChatStorage, broker defs.Broker) error {
 	const fn = "peer.Init"
 
 	advertiseIP := os.Getenv("ADVERTISE_IP")
@@ -106,12 +158,10 @@ func (P *Peer) Init(log *slog.Logger) error {
 	P.Host = host
 	P.PrivKey = privKey
 	P.MyPeerID = host.ID().String()
-	P.ActivePeerID.Store("")
 	P.Streams = make(map[string]*SafeStream, 100)
 	P.StreamsMut = sync.RWMutex{}
-	P.Chats = make(map[string][]Mssg, 100)
-	P.ChatsMut = sync.RWMutex{}
-	P.NewMessage = make(chan struct{}, 1)
+	P.Chats = chats
+	P.Broker = broker
 
 	P.SessionPrivKey, P.SessionPubKeys, err = e2ee.GenerateSessionKeys(privKey)
 	if err != nil {
@@ -121,9 +171,11 @@ func (P *Peer) Init(log *slog.Logger) error {
 	host.SetStreamHandler(PROTOCOL, func(s network.Stream) {
 		_, err := P.streamsHandler(log, s)
 		if err != nil {
-			fmt.Println("Errot during handling incoming stream: ", err)
+			fmt.Println("Error during handling incoming stream: ", err)
 		}
 	})
+
+	go P.readBroker(ctx, log)
 
 	return nil
 }

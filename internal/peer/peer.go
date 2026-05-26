@@ -38,14 +38,12 @@ type SafeStream struct {
 }
 
 type Peer struct {
-	Host    host.Host
-	PrivKey crypto.PrivKey
+	Host     host.Host
+	MyPeerID string
 
+	PrivKey        crypto.PrivKey
 	SessionPrivKey *ecdh.PrivateKey
 	SessionPubKeys []byte
-
-	MyPeerID     string
-	ActivePeerID atomic.Value
 
 	Streams    map[string]*SafeStream
 	StreamsMut sync.RWMutex

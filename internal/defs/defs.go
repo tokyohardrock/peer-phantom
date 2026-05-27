@@ -21,14 +21,15 @@ const (
 type Message struct {
 	Author  string
 	Message string
+	Status  MessageStatus
 
-	Status MessageStatus
+	Mutex *sync.RWMutex
 }
 
 type ChatData struct {
 	RemoteUser  string
 	UnreadCount int
-	Messages    []Message
+	Messages    []*Message
 
 	Mutex *sync.RWMutex
 }
@@ -37,7 +38,7 @@ func InitChatData(RemoteUser string) *ChatData {
 	return &ChatData{
 		RemoteUser:  RemoteUser,
 		UnreadCount: 0,
-		Messages:    make([]Message, 0, 100),
+		Messages:    make([]*Message, 0, 100),
 		Mutex:       &sync.RWMutex{},
 	}
 }
@@ -96,7 +97,7 @@ func (d *ChatData) AppendMessage(author string, message string) {
 	d.Mutex.Lock()
 	defer d.Mutex.Unlock()
 
-	d.Messages = append(d.Messages, Message{
+	d.Messages = append(d.Messages, &Message{
 		Author:  author,
 		Message: message,
 	})

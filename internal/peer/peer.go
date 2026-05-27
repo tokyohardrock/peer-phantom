@@ -80,7 +80,9 @@ func (P *Peer) readBroker(ctx context.Context, log *slog.Logger) {
 			continue
 		}
 
-		chat.Mutex.Lock()
+		pendingMsgs := make([]*defs.Message, 0, 3)
+
+		chat.Mutex.RLock()
 
 		for _, msg := range slices.Backward(chat.Messages) {
 			if msg.Status == defs.Sent {
@@ -88,21 +90,29 @@ func (P *Peer) readBroker(ctx context.Context, log *slog.Logger) {
 			}
 
 			if msg.Status == defs.Pending {
-				err = P.WriteToStream(s.Stream, "")
-				if err != nil {
-					log.Error(
-						fmt.Sprintf("%s: during writing to stream %w", fn, err),
-					)
-
-					msg.Status = defs.Error
-					continue
-				}
-
-				msg.Status = defs.Sent
+				pendingMsgs = append(pendingMsgs, msg)
 			}
 		}
 
-		chat.Mutex.Unlock()
+		chat.Mutex.RUnlock()
+
+		for _, msg := range slices.Backward(pendingMsgs) {
+			msg.Mutex.Lock()
+
+			err = P.WriteToStream(s.Stream, msg.Message)
+			if err != nil {
+				log.Error(
+					fmt.Sprintf("%s: during writing to stream %w", fn, err),
+				)
+
+				msg.Status = defs.Error
+				msg.Mutex.Unlock()
+				continue
+			}
+
+			msg.Status = defs.Sent
+			msg.Mutex.Unlock()
+		}
 	}
 }
 

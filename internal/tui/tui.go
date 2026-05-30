@@ -272,13 +272,18 @@ func readBroker(broker defs.Broker) tea.Cmd {
 	}
 }
 
-func Run(chats defs.ChatStorage, broker defs.Broker) error {
+func Run(chats *defs.ChatStorage, broker defs.Broker, myAddresses []string) error {
 	m := model{
-		state:  screenList,
-		list:   initialListModel(),
+		state: screenList,
+		list: initialListModel(
+			convertChatDataIntoListItem(
+				chats.GetChatSlice(),
+			),
+		),
 		chat:   initialChatModel(),
 		chats:  chats,
 		broker: broker,
+		peer:   myAddresses,
 	}
 
 	p := tea.NewProgram(m)

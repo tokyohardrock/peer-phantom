@@ -27,30 +27,47 @@ type Message struct {
 }
 
 type ChatData struct {
-	RemoteUser  string
+	ID         string
+	RemoteAddr string
+
 	UnreadCount int
 	Messages    []*Message
 
-	Mutex *sync.RWMutex
+	Mutex sync.RWMutex
 }
 
-func InitChatData(RemoteUser string) *ChatData {
+func InitChatData(remoteAddr string) (*ChatData, error) {
+	const fn = "defs.InitChatData"
+
+	_, id, ok := strings.Cut(remoteAddr, "/p2p/")
+	if !ok {
+		return nil, fmt.Errorf("%s: invalid address", fn)
+	}
+
 	return &ChatData{
-		RemoteUser:  RemoteUser,
+		ID:          id,
+		RemoteAddr:  remoteAddr,
 		UnreadCount: 0,
 		Messages:    make([]*Message, 0, 100),
-		Mutex:       &sync.RWMutex{},
-	}
+		Mutex:       sync.RWMutex{},
+	}, nil
 }
 
-func (d ChatData) GetRemoteUser() string {
+func (d *ChatData) GetChatID() string {
 	d.Mutex.RLock()
 	defer d.Mutex.RUnlock()
 
-	return d.RemoteUser
+	return d.ID
 }
 
-func (d ChatData) GetUnreadCount() int {
+func (d *ChatData) GetRemoteAddress() string {
+	d.Mutex.RLock()
+	defer d.Mutex.RUnlock()
+
+	return d.RemoteAddr
+}
+
+func (d *ChatData) GetUnreadCount() int {
 	d.Mutex.RLock()
 	defer d.Mutex.RUnlock()
 
@@ -71,12 +88,12 @@ func (d ChatData) GetMessageSlice() []string {
 	return s
 }
 
-func (d ChatData) Title() string {
+func (d *ChatData) Title() string {
 	if d.GetUnreadCount() > 0 {
-		return fmt.Sprintf("%s (!)", d.RemoteUser)
+		return fmt.Sprintf("%s (!)", d.ID)
 	}
 
-	return d.RemoteUser
+	return d.ID
 }
 
 func (d ChatData) Description() string {
@@ -89,8 +106,8 @@ func (d ChatData) Description() string {
 	return "no new Messages"
 }
 
-func (d ChatData) FilterValue() string {
-	return d.RemoteUser
+func (d *ChatData) FilterValue() string {
+	return d.ID
 }
 
 func (d *ChatData) AppendMessage(author string, message string, status MessageStatus) {

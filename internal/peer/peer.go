@@ -394,7 +394,10 @@ func (P *Peer) UpdateChatHistory(remoteUser string, author string, message strin
 	}
 
 	if err != nil {
-		chat = P.Chats.AddChat(remoteUser)
+		chat, err = P.Chats.AddChat(remoteUser)
+		if err != nil {
+			return fmt.Errorf("%s: %w", fn, err)
+		}
 	}
 
 	chat.AppendMessage(author, message)

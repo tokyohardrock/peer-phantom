@@ -400,8 +400,8 @@ func (P *Peer) UpdateChatHistory(remoteUser string, author string, message strin
 		}
 	}
 
-	chat.AppendMessage(author, message)
 	if author != P.MyPeerID {
+		chat.AppendMessage(author, message, defs.Received)
 		chat.NewMessage()
 	}
 

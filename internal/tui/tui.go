@@ -32,30 +32,30 @@ type chatModel struct {
 	textarea    textarea.Model
 	senderStyle lipgloss.Style
 
-	chatData *defs.ChatData
+	selectedChat *defs.ChatData
 }
 
 func initialChatModel() chatModel {
-	ta := textarea.New()
+	textarea := textarea.New()
 
-	ta.CharLimit = 280
-	ta.ShowLineNumbers = false
-	ta.Prompt = "┃ "
-	ta.Placeholder = "Type a message..."
+	textarea.CharLimit = 280
+	textarea.ShowLineNumbers = false
+	textarea.Prompt = "┃ "
+	textarea.Placeholder = "Type a message..."
 
-	ta.SetVirtualCursor(true)
-	ta.SetHeight(3)
-	ta.Focus()
+	textarea.SetVirtualCursor(true)
+	textarea.SetHeight(3)
+	textarea.Focus()
 
-	s := ta.Styles()
-	s.Focused.CursorLine = lipgloss.NewStyle()
-	ta.SetStyles(s)
+	style := textarea.Styles()
+	style.Focused.CursorLine = lipgloss.NewStyle()
+	textarea.SetStyles(style)
 
 	return chatModel{
-		textarea:    ta,
-		viewport:    viewport.New(),
-		senderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
-		chatData:    nil,
+		textarea:     textarea,
+		viewport:     viewport.New(),
+		senderStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
+		selectedChat: nil,
 	}
 }
 

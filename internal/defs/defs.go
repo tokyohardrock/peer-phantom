@@ -74,7 +74,7 @@ func (d *ChatData) GetUnreadCount() int {
 	return d.UnreadCount
 }
 
-func (d ChatData) GetMessageSlice() []string {
+func (d *ChatData) GetMessageSlice() []string {
 	d.Mutex.RLock()
 	defer d.Mutex.RUnlock()
 
@@ -96,7 +96,7 @@ func (d *ChatData) Title() string {
 	return d.ID
 }
 
-func (d ChatData) Description() string {
+func (d *ChatData) Description() string {
 	UnreadCount := d.GetUnreadCount()
 
 	if UnreadCount > 0 {

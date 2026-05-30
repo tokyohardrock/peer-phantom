@@ -111,9 +111,8 @@ func (d *ChatData) FilterValue() string {
 	return d.ID
 }
 
-func (d *ChatData) AppendMessage(author string, message string, status MessageStatus) {
+func (d *ChatData) AppendMessage(author string, message string, status MessageStatus, storage *ChatStorage) {
 	d.Mutex.Lock()
-	defer d.Mutex.Unlock()
 
 	d.Messages = append(d.Messages, &Message{
 		Author:  author,

@@ -225,7 +225,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				return m, nil
 			case "enter":
-				m.chat.selectedChat.AppendMessage("", m.chat.textarea.Value(), defs.Pending)
+				m.chat.selectedChat.AppendMessage("", m.chat.textarea.Value(), defs.Pending, m.chats)
 				m.broker.UpdateOnBack <- m.chat.selectedChat
 				m.chat.textarea.Reset()
 

@@ -129,6 +129,13 @@ func (d *ChatData) NewMessage() {
 	d.UnreadCount++
 }
 
+func (d *ChatData) MarkAsRead() {
+	d.Mutex.Lock()
+	defer d.Mutex.Unlock()
+
+	d.UnreadCount = 0
+}
+
 type ChatStorage struct {
 	Chats map[string]*ChatData
 	Mutex *sync.RWMutex

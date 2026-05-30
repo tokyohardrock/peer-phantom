@@ -2,6 +2,7 @@ package defs
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -120,6 +121,10 @@ func (d *ChatData) AppendMessage(author string, message string, status MessageSt
 		Status:  status,
 		Mutex:   sync.RWMutex{},
 	})
+
+	d.Mutex.Unlock()
+
+	storage.PushChatOnTop(d)
 }
 
 func (d *ChatData) NewMessage() {
@@ -176,8 +181,10 @@ func (s *ChatStorage) AddChat(remoteAddr string) (*ChatData, error) {
 	}
 
 	s.Mutex.Lock()
-	s.Chats[chatData.ID] = chatData
+	s.ChatMap[chatData.ID] = chatData
 	s.Mutex.Unlock()
+
+	s.PushChatOnTop(chatData)
 
 	return chatData, nil
 }
@@ -192,6 +199,20 @@ func (s *ChatStorage) GetChatSlice() []*ChatData {
 	}
 
 	return chatSlice
+}
+
+func (s *ChatStorage) PushChatOnTop(targetChat *ChatData) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	idx := slices.IndexFunc(s.ChatSlice, func(chat *ChatData) bool {
+		return chat.ID == targetChat.ID
+	})
+	if idx != -1 {
+		s.ChatSlice = slices.Delete(s.ChatSlice, idx, idx+1)
+	}
+
+	s.ChatSlice = slices.Insert(s.ChatSlice, 0, targetChat)
 }
 
 type Broker struct {

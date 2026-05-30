@@ -6,8 +6,7 @@ import (
 	"crypto/ecdh"
 	"errors"
 	"fmt"
-	"log/slog"
-	"os"
+	log "log/slog"
 	"slices"
 	"sync"
 	"time"
@@ -52,7 +51,7 @@ type Peer struct {
 	Broker defs.Broker
 }
 
-func (P *Peer) readBroker(ctx context.Context, log *slog.Logger) {
+func (P *Peer) readBroker(ctx context.Context) {
 	const fn = "peer.readBroker"
 
 	for {
@@ -72,7 +71,7 @@ func (P *Peer) readBroker(ctx context.Context, log *slog.Logger) {
 			continue
 		}
 
-		s, err := P.GetStreamToPeer(ctx, log, info.ID)
+		s, err := P.GetStreamToPeer(ctx, info.ID)
 		if err != nil {
 			log.Error(
 				fmt.Sprintf("%s: during getting stream to peer %w", fn, err),
@@ -116,7 +115,7 @@ func (P *Peer) readBroker(ctx context.Context, log *slog.Logger) {
 	}
 }
 
-func (P *Peer) Init(ctx context.Context, log *slog.Logger, chats defs.ChatStorage, broker defs.Broker) error {
+func (P *Peer) Init(ctx context.Context, chats *defs.ChatStorage, broker defs.Broker) error {
 	const fn = "peer.Init"
 
 	advertiseIP := os.Getenv("ADVERTISE_IP")
@@ -179,13 +178,13 @@ func (P *Peer) Init(ctx context.Context, log *slog.Logger, chats defs.ChatStorag
 	}
 
 	host.SetStreamHandler(PROTOCOL, func(s network.Stream) {
-		_, err := P.streamsHandler(log, s)
+		_, err := P.streamsHandler(s)
 		if err != nil {
 			fmt.Println("Error during handling incoming stream: ", err)
 		}
 	})
 
-	go P.readBroker(ctx, log)
+	go P.readBroker(ctx)
 
 	return nil
 }
@@ -222,7 +221,7 @@ func (P *Peer) CheckStream(info string) *SafeStream {
 	return stream
 }
 
-func (P *Peer) GetStreamToPeer(ctx context.Context, log *slog.Logger, info peer.ID) (*SafeStream, error) {
+func (P *Peer) GetStreamToPeer(ctx context.Context, info peer.ID) (*SafeStream, error) {
 	const fn = "peer.GetStreamToPeer"
 
 	ctx, cancel := context.WithTimeout(ctx, TIMEOUT*time.Second)
@@ -235,7 +234,7 @@ func (P *Peer) GetStreamToPeer(ctx context.Context, log *slog.Logger, info peer.
 			return nil, fmt.Errorf("%s during creating new stream: %w", fn, err)
 		}
 
-		stream, err = P.streamsHandler(log, s)
+		stream, err = P.streamsHandler(s)
 		if err != nil {
 			return nil, fmt.Errorf("%s during handling stream: %w", fn, err)
 		}
@@ -277,7 +276,7 @@ func (P *Peer) getKeyToStream(remoteUser peer.ID, info []byte) ([]byte, error) {
 	return key, nil
 }
 
-func (P *Peer) readFromStream(log *slog.Logger, s network.Stream) {
+func (P *Peer) readFromStream(s network.Stream) {
 	const fn = "peer.ReadFromStream"
 
 	remoteUser := s.Conn().RemotePeer()
@@ -386,7 +385,7 @@ func (P *Peer) UpdateChatHistory(remoteUser string, author string, message strin
 	return nil
 }
 
-func (P *Peer) streamsHandler(log *slog.Logger, s network.Stream) (*SafeStream, error) {
+func (P *Peer) streamsHandler(s network.Stream) (*SafeStream, error) {
 	const fn = "peer.streamsHandler"
 
 	stream := &SafeStream{
@@ -404,7 +403,7 @@ func (P *Peer) streamsHandler(log *slog.Logger, s network.Stream) (*SafeStream, 
 		return nil, fmt.Errorf("%s during writing session public keys to stream: %w", fn, err)
 	}
 
-	go P.readFromStream(log, s)
+	go P.readFromStream(s)
 
 	return stream, nil
 }

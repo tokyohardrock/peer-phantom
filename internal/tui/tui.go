@@ -4,7 +4,6 @@ import (
 	"fmt"
 	log "log/slog"
 	"peer-phantom/internal/defs"
-	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/list"
@@ -142,19 +141,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 	case ChatUpdateMsg:
-		// push received chat on top of the list
 		list := m.chats.GetChatSlice()
 
-		idx := slices.IndexFunc(list, func(chat *defs.ChatData) bool {
-			return chat.ID == msg.Chat.ID
-		})
-		if idx != -1 {
-			list = slices.Delete(list, idx, idx+1)
-		}
-
-		list = slices.Insert(list, 0, msg.Chat)
-
-		// refresh chat viewport if received chat is selected
 		if m.chat.selectedChat != nil && m.chat.selectedChat.ID == msg.Chat.ID {
 			m.chat.selectedChat.MarkAsRead()
 			refreshChatView()

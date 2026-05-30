@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	log "log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,14 +20,21 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	go gracefulShutdown(sigChan)
 
-	log := logger.InitLogger()
+	f, err := os.OpenFile("debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer f.Close()
+
+	log.SetDefault(logger.InitLogger(f))
 
 	chats := defs.InitChatStorage()
 	broker := defs.InitBroker()
 
 	var host peer.Peer
 
-	err := host.Init(ctx, log, chats, broker)
+	err = host.Init(ctx, chats, broker)
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(1)

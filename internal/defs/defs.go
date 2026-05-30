@@ -161,7 +161,7 @@ func (s *ChatStorage) GetChat(ID string) (*ChatData, error) {
 	const fn = "defs.GetChatData"
 
 	s.Mutex.RLock()
-	data, ok := s.Chats[ID]
+	data, ok := s.ChatMap[ID]
 	s.Mutex.RUnlock()
 
 	if !ok {

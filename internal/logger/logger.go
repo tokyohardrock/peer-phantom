@@ -5,8 +5,8 @@ import (
 	"os"
 )
 
-func InitLogger() *slog.Logger {
-	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+func InitLogger(f *os.File) *slog.Logger {
+	log := slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
 

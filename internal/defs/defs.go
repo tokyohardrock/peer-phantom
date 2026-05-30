@@ -138,23 +138,23 @@ func (d *ChatData) MarkAsRead() {
 
 type ChatStorage struct {
 	Chats map[string]*ChatData
-	Mutex *sync.RWMutex
+	Mutex sync.RWMutex
 }
 
-func InitChatStorage() ChatStorage {
-	cs := ChatStorage{
+func InitChatStorage() *ChatStorage {
+	storage := &ChatStorage{
 		Chats: make(map[string]*ChatData, 10),
-		Mutex: &sync.RWMutex{},
+		Mutex: sync.RWMutex{},
 	}
 
-	return cs
+	return storage
 }
 
-func (s ChatStorage) GetChat(RemoteUser string) (*ChatData, error) {
+func (s *ChatStorage) GetChat(ID string) (*ChatData, error) {
 	const fn = "defs.GetChatData"
 
 	s.Mutex.RLock()
-	data, ok := s.Chats[RemoteUser]
+	data, ok := s.Chats[ID]
 	s.Mutex.RUnlock()
 
 	if !ok {
@@ -164,17 +164,22 @@ func (s ChatStorage) GetChat(RemoteUser string) (*ChatData, error) {
 	return data, nil
 }
 
-func (s ChatStorage) AddChat(RemoteUser string) *ChatData {
-	chatData := InitChatData(RemoteUser)
+func (s *ChatStorage) AddChat(remoteAddr string) (*ChatData, error) {
+	const fn = "defs.AddChat"
+
+	chatData, err := InitChatData(remoteAddr)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", fn, err)
+	}
 
 	s.Mutex.Lock()
-	s.Chats[RemoteUser] = chatData
+	s.Chats[chatData.ID] = chatData
 	s.Mutex.Unlock()
 
-	return chatData
+	return chatData, nil
 }
 
-func (s ChatStorage) GetChatSlice() []*ChatData {
+func (s *ChatStorage) GetChatSlice() []*ChatData {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 

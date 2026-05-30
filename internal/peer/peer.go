@@ -98,6 +98,8 @@ func (P *Peer) readBroker(ctx context.Context) {
 		for _, msg := range slices.Backward(pendingMsgs) {
 			msg.Mutex.Lock()
 
+			msg.Author = P.MyPeerID
+
 			err = P.WriteToStream(s.Stream, msg.Message)
 			if err != nil {
 				log.Error(

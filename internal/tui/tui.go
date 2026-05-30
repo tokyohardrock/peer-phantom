@@ -90,10 +90,12 @@ type model struct {
 	list list.Model
 	chat chatModel
 
-	chats  defs.ChatStorage
+	chats  *defs.ChatStorage
 	broker defs.Broker
 
 	state sessionState
+
+	peer []string
 }
 
 func (m model) Init() tea.Cmd {

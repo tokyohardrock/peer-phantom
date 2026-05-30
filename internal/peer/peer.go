@@ -416,7 +416,7 @@ func (P *Peer) streamsHandler(s network.Stream) (*SafeStream, error) {
 	stream := &SafeStream{
 		Stream: s,
 		Key:    make([]byte, 32),
-		isInit: make(chan struct{}),
+		isInit: make(chan struct{}, 1),
 	}
 
 	P.StreamsMut.Lock()

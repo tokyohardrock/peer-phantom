@@ -23,7 +23,7 @@ type Message struct {
 	Message string
 	Status  MessageStatus
 
-	Mutex *sync.RWMutex
+	Mutex sync.RWMutex
 }
 
 type ChatData struct {
@@ -93,13 +93,15 @@ func (d ChatData) FilterValue() string {
 	return d.RemoteUser
 }
 
-func (d *ChatData) AppendMessage(author string, message string) {
+func (d *ChatData) AppendMessage(author string, message string, status MessageStatus) {
 	d.Mutex.Lock()
 	defer d.Mutex.Unlock()
 
 	d.Messages = append(d.Messages, &Message{
 		Author:  author,
 		Message: message,
+		Status:  status,
+		Mutex:   sync.RWMutex{},
 	})
 }
 

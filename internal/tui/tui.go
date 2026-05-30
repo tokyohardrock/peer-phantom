@@ -248,11 +248,15 @@ func (m model) View() tea.View {
 
 	switch m.state {
 	case screenList:
-		innerView := m.list.View() + "\n" + "↑/↓: navigate    /: search    Enter: open chat    Q: quit"
-		v = tea.NewView(docStyle.Render(innerView))
+		helpStr := "\n" + "↑/↓: navigate    /: search    Enter: open chat    Q: quit"
+		addresses := "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("8")).
+			Render(strings.Join(m.peer, "\n"))
+		v = tea.NewView(docStyle.Render(m.list.View() + addresses + helpStr))
 	case screenChat:
 		viewportView := m.chat.viewport.View()
-		v = tea.NewView(viewportView + "\n" + m.chat.textarea.View())
+		content := viewportView + "\n" + m.chat.textarea.View()
+
+		v = tea.NewView(content)
 		v.MouseMode = tea.MouseModeCellMotion
 	}
 

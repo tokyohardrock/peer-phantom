@@ -40,7 +40,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = tui.Run(chats, broker)
+	m := make([]string, 0, 3)
+	gg := host.Host.Addrs()
+
+	for i := range gg {
+		m = append(m, fmt.Sprintf("%s/p2p/%s", gg[i].String(), host.MyPeerID))
+	}
+
+	err = tui.Run(chats, broker, m)
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(1)

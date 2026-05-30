@@ -47,7 +47,7 @@ type Peer struct {
 	Streams    map[string]*SafeStream
 	StreamsMut sync.RWMutex
 
-	Chats  defs.ChatStorage
+	Chats  *defs.ChatStorage
 	Broker defs.Broker
 }
 

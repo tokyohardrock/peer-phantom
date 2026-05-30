@@ -59,16 +59,31 @@ func initialChatModel() chatModel {
 	}
 }
 
-func initialListModel() list.Model {
-	l := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
+func convertChatDataIntoListItem(items []*defs.ChatData) []list.Item {
+	listItems := make([]list.Item, 0, len(items)+1)
 
-	l.Title = "PEER PHANTOM // CHATS"
-	l.FilterInput.Prompt = "Search: "
-	l.FilterInput.Placeholder = "Type multiaddress..."
-	l.SetShowHelp(false)
-	l.SetShowStatusBar(false)
+	listItems = append(listItems, &defs.ChatData{
+		ID: "Test Chat",
+	})
 
-	return l
+	for _, item := range items {
+		listItems = append(listItems, item)
+	}
+
+	return listItems
+}
+
+func initialListModel(items []list.Item) list.Model {
+	list := list.New(items, list.NewDefaultDelegate(), 0, 0)
+
+	list.Title = "PEER PHANTOM // CHATS"
+	list.FilterInput.Prompt = "Search: "
+	list.FilterInput.Placeholder = "Type multiaddress..."
+	list.FilterInput.CharLimit = 0
+	list.SetShowHelp(false)
+	list.SetShowStatusBar(false)
+
+	return list
 }
 
 type model struct {

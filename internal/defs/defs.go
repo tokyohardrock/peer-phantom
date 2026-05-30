@@ -137,14 +137,17 @@ func (d *ChatData) MarkAsRead() {
 }
 
 type ChatStorage struct {
-	Chats map[string]*ChatData
+	ChatMap   map[string]*ChatData
+	ChatSlice []*ChatData
+
 	Mutex sync.RWMutex
 }
 
 func InitChatStorage() *ChatStorage {
 	storage := &ChatStorage{
-		Chats: make(map[string]*ChatData, 10),
-		Mutex: sync.RWMutex{},
+		ChatMap:   make(map[string]*ChatData, 10),
+		ChatSlice: make([]*ChatData, 0, 10),
+		Mutex:     sync.RWMutex{},
 	}
 
 	return storage

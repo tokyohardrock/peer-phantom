@@ -16,7 +16,10 @@ import (
 
 var docStyle = lipgloss.NewStyle().Margin(1, 1)
 
-type ChatUpdateMsg *defs.ChatData
+type ChatUpdateMsg struct {
+	Chat *defs.ChatData
+}
+
 type sessionState int
 
 const (

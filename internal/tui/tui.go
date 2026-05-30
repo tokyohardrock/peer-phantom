@@ -107,26 +107,63 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	const fn = "tui.Update"
+
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		h, v := docStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v)
+	refreshChatView := func() {
+		content := ""
 
-		m.chat.viewport.SetWidth(msg.Width)
-		m.chat.textarea.SetWidth(msg.Width)
-		m.chat.viewport.SetHeight(msg.Height - m.chat.textarea.Height())
+		if m.chat.selectedChat != nil {
+			content = strings.Join(m.chat.selectedChat.GetMessageSlice(), "\n")
+		}
+
 		m.chat.viewport.SetContent(
 			lipgloss.
 				NewStyle().
 				Width(m.chat.viewport.Width()).
 				Render(
-					strings.Join(m.chat.chatData.GetMessageSlice(), "\n"),
+					content,
 				),
 		)
 		m.chat.viewport.GotoBottom()
+	}
+
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		h, v := docStyle.GetFrameSize()
+		m.list.SetSize(msg.Width-h, msg.Height-v-3)
+
+		m.chat.viewport.SetWidth(msg.Width)
+		m.chat.textarea.SetWidth(msg.Width)
+		m.chat.viewport.SetHeight(msg.Height - m.chat.textarea.Height())
+		refreshChatView()
+
+		return m, nil
+	case ChatUpdateMsg:
+		// push received chat on top of the list
+		list := m.chats.GetChatSlice()
+
+		idx := slices.IndexFunc(list, func(chat *defs.ChatData) bool {
+			return chat.ID == msg.Chat.ID
+		})
+		if idx != -1 {
+			list = slices.Delete(list, idx, idx+1)
+		}
+
+		list = slices.Insert(list, 0, msg.Chat)
+
+		// refresh chat viewport if received chat is selected
+		if m.chat.selectedChat != nil && m.chat.selectedChat.ID == msg.Chat.ID {
+			m.chat.selectedChat.MarkAsRead()
+			refreshChatView()
+		}
+
+		return m, tea.Batch(
+			m.list.SetItems(convertChatDataIntoListItem(list)),
+			readBroker(m.broker),
+		)
 	}
 
 	switch m.state {

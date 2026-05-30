@@ -63,7 +63,7 @@ func (P *Peer) readBroker(ctx context.Context) {
 			return
 		}
 
-		info, err := P.ConnectToPeer(ctx, chat.GetRemoteUser())
+		info, err := P.ConnectToPeer(ctx, chat.GetRemoteAddress())
 		if err != nil {
 			log.Error(
 				fmt.Sprintf("%s: during connecting to peer %w", fn, err),

@@ -183,7 +183,7 @@ func (s *ChatStorage) GetChatSlice() []*ChatData {
 	s.Mutex.RLock()
 	defer s.Mutex.RUnlock()
 
-	chatSlice := make([]*ChatData, len(s.Chats))
+	chatSlice := make([]*ChatData, 0, len(s.Chats))
 	for _, v := range s.Chats {
 		chatSlice = append(chatSlice, v)
 	}

@@ -2,7 +2,9 @@ package tui
 
 import (
 	"fmt"
+	log "log/slog"
 	"peer-phantom/internal/defs"
+	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/list"

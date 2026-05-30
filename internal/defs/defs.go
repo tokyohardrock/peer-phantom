@@ -191,15 +191,6 @@ func (s *ChatStorage) GetChatSlice() []*ChatData {
 	return chatSlice
 }
 
-// events from front (backend receives):
-// - new chat created. need to connect
-// - new message sent. need to write to stream
-//
-// events from back (frontend receives):
-// - just need to know what chats are up to date so
-// we can really just pass *ChatData and push it on top in list
-// and in fullscreen chat just rerender the whole viewport
-
 type Broker struct {
 	UpdateOnFront chan *ChatData
 	UpdateOnBack  chan *ChatData

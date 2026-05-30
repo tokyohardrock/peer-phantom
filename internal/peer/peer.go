@@ -182,7 +182,9 @@ func (P *Peer) Init(ctx context.Context, chats *defs.ChatStorage, broker defs.Br
 	host.SetStreamHandler(PROTOCOL, func(s network.Stream) {
 		_, err := P.streamsHandler(s)
 		if err != nil {
-			fmt.Println("Error during handling incoming stream: ", err)
+			log.Error(
+				fmt.Sprintf("Error during handling incoming stream: ", err),
+			)
 		}
 	})
 

@@ -266,7 +266,9 @@ func (m model) View() tea.View {
 
 func readBroker(broker defs.Broker) tea.Cmd {
 	return func() tea.Msg {
-		return ChatUpdateMsg(<-broker.UpdateOnFront)
+		return ChatUpdateMsg{
+			Chat: <-broker.UpdateOnFront,
+		}
 	}
 }
 

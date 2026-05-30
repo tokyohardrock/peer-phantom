@@ -176,10 +176,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "q":
 				return m, tea.Quit
 			case "enter":
-				if item := m.list.SelectedItem(); item == nil {
+				selectedItem := m.list.SelectedItem()
+
+				if selectedItem == nil {
+					newChat, err := m.chats.AddChat(m.list.FilterValue())
+					if err != nil {
+						log.Error(
+							fmt.Sprintf("%s: %v", fn, err),
+						)
+						return m, nil
+					}
+
+					m.broker.UpdateOnBack <- newChat
 					m.list.ResetFilter()
+
+					return m, nil
 				}
+
+				m.chat.selectedChat = selectedItem.(*defs.ChatData)
+				m.chat.selectedChat.MarkAsRead()
 				m.state = screenChat
+
+				refreshChatView()
+				m.chat.textarea.Reset()
 
 				return m, nil
 			}
@@ -202,19 +221,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			case "esc":
 				m.state = screenList
+				m.chat.selectedChat = nil
+
 				return m, nil
 			case "enter":
-				m.chat.chatData.AppendMessage("You", m.chat.textarea.Value())
-				m.chat.viewport.SetContent(
-					lipgloss.
-						NewStyle().
-						Width(m.chat.viewport.Width()).
-						Render(
-							strings.Join(m.chat.chatData.GetMessageSlice(), "\n"),
-						),
-				)
+				m.chat.selectedChat.AppendMessage("", m.chat.textarea.Value(), defs.Pending)
+				m.broker.UpdateOnBack <- m.chat.selectedChat
 				m.chat.textarea.Reset()
-				m.chat.viewport.GotoBottom()
 
 				return m, nil
 			}

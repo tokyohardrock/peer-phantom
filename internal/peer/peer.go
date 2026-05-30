@@ -308,10 +308,28 @@ func (P *Peer) readFromStream(s network.Stream) {
 			key, err = P.getKeyToStream(remoteUser, rawMessage)
 			if err != nil {
 				log.Error(
-					fmt.Sprintf("%s during getting key to stream: %v", fn, err),
+					fmt.Sprintf("%s during getting key to stream: %w", fn, err),
 				)
 				return
 			}
+
+			maddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("%s/p2p/%s", s.Conn().RemoteMultiaddr().String(), remoteUser.String()))
+			if err != nil {
+				log.Error(
+					fmt.Sprintf("%s during parsing remote multiaddress: %w", fn, err),
+				)
+				return
+			}
+
+			chat, err := P.Chats.AddChat(maddr.String())
+			if err != nil {
+				log.Error(
+					fmt.Sprintf("%s during chat creation with remote multiaddress: %w", fn, err),
+				)
+				return
+			}
+
+			P.Broker.UpdateOnFront <- chat
 			continue
 		}
 

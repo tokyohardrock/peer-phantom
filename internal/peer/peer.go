@@ -65,6 +65,9 @@ func (P *Peer) readBroker(ctx context.Context) {
 
 		info, err := P.ConnectToPeer(ctx, chat.GetRemoteAddress())
 		if err != nil {
+			chat.SetConnStatus(defs.Failed)
+			P.Broker.UpdateOnFront <- chat
+
 			log.Error(
 				fmt.Sprintf("%s: during connecting to peer %w", fn, err),
 			)
@@ -73,6 +76,9 @@ func (P *Peer) readBroker(ctx context.Context) {
 
 		s, err := P.GetStreamToPeer(ctx, info.ID)
 		if err != nil {
+			chat.SetConnStatus(defs.Failed)
+			P.Broker.UpdateOnFront <- chat
+
 			log.Error(
 				fmt.Sprintf("%s: during getting stream to peer %w", fn, err),
 			)
@@ -291,6 +297,12 @@ func (P *Peer) readFromStream(s network.Stream) {
 	for {
 		rawMessage, err := utils.ReadMessageWithLengthPrefix(reader)
 		if err != nil {
+			chat, err := P.Chats.GetChat(remoteUser.String())
+			if err == nil {
+				chat.SetConnStatus(defs.Failed)
+				P.Broker.UpdateOnFront <- chat
+			}
+
 			log.Error(
 				fmt.Sprintf("%s during reading message with prefix: %v", fn, err),
 			)
@@ -328,6 +340,8 @@ func (P *Peer) readFromStream(s network.Stream) {
 				)
 				return
 			}
+
+			chat.SetConnStatus(defs.Connected)
 
 			P.Broker.UpdateOnFront <- chat
 			continue

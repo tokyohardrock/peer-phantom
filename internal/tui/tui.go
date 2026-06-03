@@ -73,14 +73,23 @@ func convertChatDataIntoListItem(items []*defs.ChatData) []list.Item {
 }
 
 func initialListModel(items []list.Item) list.Model {
-	list := list.New(items, list.NewDefaultDelegate(), 0, 0)
+	delegate := list.NewDefaultDelegate()
 
-	list.Title = "PEER PHANTOM // CHATS"
+	delegate.Styles.SelectedTitle = delegate.Styles.SelectedTitle.
+		Foreground(lipgloss.Color("4")).
+		BorderLeftForeground(lipgloss.Color("4"))
+	delegate.Styles.SelectedDesc = delegate.Styles.SelectedDesc.
+		Foreground(lipgloss.Color("8")).
+		BorderLeftForeground(lipgloss.Color("4"))
+
+	list := list.New(items, delegate, 0, 0)
+
 	list.FilterInput.Prompt = "Search: "
 	list.FilterInput.Placeholder = "Type multiaddress..."
 	list.FilterInput.CharLimit = 0
 	list.SetShowHelp(false)
 	list.SetShowStatusBar(false)
+	list.SetShowTitle(false)
 
 	return list
 }
@@ -182,6 +191,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				m.chat.selectedChat = selectedItem.(*defs.ChatData)
+				m.list.Select(1)
 				m.chat.selectedChat.MarkAsRead()
 				m.state = screenChat
 
@@ -236,10 +246,14 @@ func (m model) View() tea.View {
 
 	switch m.state {
 	case screenList:
-		helpStr := "\n" + "↑/↓: navigate    /: search    Enter: open chat    Q: quit"
+		title := lipgloss.NewStyle().
+			Background(lipgloss.Color("4")).
+			Foreground(lipgloss.Color("0")).
+			Render(" PEER PHANTOM ") + "\n"
+		//helpStr := "\n" + "↑/↓: navigate    /: search    Enter: open chat    Q: quit"
 		addresses := "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("8")).
 			Render(strings.Join(m.peer, "\n"))
-		v = tea.NewView(docStyle.Render(m.list.View() + addresses + helpStr))
+		v = tea.NewView(docStyle.Render(title + m.list.View() + addresses))
 	case screenChat:
 		viewportView := m.chat.viewport.View()
 		content := viewportView + "\n" + m.chat.textarea.View()

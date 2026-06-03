@@ -178,13 +178,18 @@ func (s *ChatStorage) GetChat(ID string) (*ChatData, error) {
 func (s *ChatStorage) AddChat(remoteAddr string) (*ChatData, error) {
 	const fn = "defs.AddChat"
 
-	chatData, err := InitChatData(remoteAddr)
+	id, err := getIDFromRemoteAddr(remoteAddr)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", fn, err)
 	}
 
 	s.Mutex.Lock()
-	s.ChatMap[chatData.ID] = chatData
+	chatData, ok := s.ChatMap[id]
+
+	if !ok {
+		chatData = InitChatData(remoteAddr, id)
+		s.ChatMap[id] = chatData
+	}
 	s.Mutex.Unlock()
 
 	s.PushChatOnTop(chatData)

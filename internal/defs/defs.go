@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+
+	"github.com/multiformats/go-multiaddr"
 )
 
 var ErrorNoChat = fmt.Errorf("no chat with this user")
@@ -204,6 +206,11 @@ func (s *ChatStorage) GetChat(ID string) (*ChatData, error) {
 
 func (s *ChatStorage) AddChat(remoteAddr string) (*ChatData, error) {
 	const fn = "defs.AddChat"
+
+	_, err := multiaddr.NewMultiaddr(remoteAddr)
+	if err != nil {
+		return nil, fmt.Errorf("%s: during remote address validation %w", fn, err)
+	}
 
 	id, err := getIDFromRemoteAddr(remoteAddr)
 	if err != nil {

@@ -37,14 +37,18 @@ type ChatData struct {
 	Mutex sync.RWMutex
 }
 
-func InitChatData(remoteAddr string) (*ChatData, error) {
-	const fn = "defs.InitChatData"
+func getIDFromRemoteAddr(remoteAddr string) (string, error) {
+	const fn = "defs.getIDFromRemoteAddr"
 
 	_, id, ok := strings.Cut(remoteAddr, "/p2p/")
 	if !ok {
-		return nil, fmt.Errorf("%s: invalid address", fn)
+		return "", fmt.Errorf("%s: invalid address", fn)
 	}
 
+	return id, nil
+}
+
+func InitChatData(remoteAddr string, id string) *ChatData {
 	return &ChatData{
 		ID:          id,
 		RemoteAddr:  remoteAddr,

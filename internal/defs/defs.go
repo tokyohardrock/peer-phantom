@@ -116,21 +116,26 @@ func (d *ChatData) GetMessageSlice() []string {
 }
 
 func (d *ChatData) Title() string {
-	if d.GetUnreadCount() > 0 {
-		return fmt.Sprintf("%s (!)", d.ID)
+	if uc := d.GetUnreadCount(); uc > 0 {
+		return fmt.Sprintf("%s (%d)", d.ID, uc)
 	}
 
 	return d.ID
 }
 
 func (d *ChatData) Description() string {
-	UnreadCount := d.GetUnreadCount()
+	connStatus := d.GetConnStatus()
 
-	if UnreadCount > 0 {
-		return fmt.Sprintf("%d new Messages", UnreadCount)
+	switch connStatus {
+	case Connecting:
+		return "connecting..."
+	case Connected:
+		return "connected"
+	case Failed:
+		return "failed to connect"
+	default:
+		return "invalid connection status"
 	}
-
-	return "no new Messages"
 }
 
 func (d *ChatData) FilterValue() string {

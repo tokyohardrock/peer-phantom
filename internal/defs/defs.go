@@ -11,12 +11,19 @@ var ErrorNoChat = fmt.Errorf("no chat with this user")
 var ErrorOutOfRange = fmt.Errorf("given index is out of range")
 
 type MessageStatus int
+type ConnStatus int
 
 const (
 	Sent MessageStatus = iota
 	Pending
 	Received
 	Error
+)
+
+const (
+	Connecting ConnStatus = iota
+	Connected
+	Failed
 )
 
 type Message struct {
@@ -30,6 +37,7 @@ type Message struct {
 type ChatData struct {
 	ID         string
 	RemoteAddr string
+	ConnStatus ConnStatus
 
 	UnreadCount int
 	Messages    []*Message
@@ -52,10 +60,11 @@ func InitChatData(remoteAddr string, id string) *ChatData {
 	return &ChatData{
 		ID:          id,
 		RemoteAddr:  remoteAddr,
+		ConnStatus:  Connecting,
 		UnreadCount: 0,
 		Messages:    make([]*Message, 0, 100),
 		Mutex:       sync.RWMutex{},
-	}, nil
+	}
 }
 
 func (d *ChatData) GetChatID() string {
@@ -77,6 +86,19 @@ func (d *ChatData) GetUnreadCount() int {
 	defer d.Mutex.RUnlock()
 
 	return d.UnreadCount
+}
+
+func (d *ChatData) GetConnStatus() ConnStatus {
+	d.Mutex.RLock()
+	defer d.Mutex.RUnlock()
+
+	return d.ConnStatus
+}
+
+func (d *ChatData) SetConnStatus(status ConnStatus) {
+	d.Mutex.Lock()
+	d.ConnStatus = status
+	d.Mutex.Unlock()
 }
 
 func (d *ChatData) GetMessageSlice() []string {

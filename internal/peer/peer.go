@@ -318,15 +318,7 @@ func (P *Peer) readFromStream(s network.Stream) {
 				return
 			}
 
-			maddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("%s/p2p/%s", s.Conn().RemoteMultiaddr().String(), remoteUser.String()))
-			if err != nil {
-				log.Error(
-					fmt.Sprintf("%s during parsing remote multiaddress: %w", fn, err),
-				)
-				return
-			}
-
-			chat, err := P.Chats.AddChat(maddr.String())
+			chat, err := P.Chats.AddChat(fmt.Sprintf("%s/p2p/%s", s.Conn().RemoteMultiaddr().String(), remoteUser.String()))
 			if err != nil {
 				log.Error(
 					fmt.Sprintf("%s during chat creation with remote multiaddress: %w", fn, err),

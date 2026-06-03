@@ -309,13 +309,6 @@ func (P *Peer) readFromStream(s network.Stream) {
 			return
 		}
 
-		if len(rawMessage) == 0 {
-			log.Error(
-				fmt.Sprintf("%s: empty message received", fn),
-			)
-			continue
-		}
-
 		if len(key) == 0 {
 			key, err = P.getKeyToStream(remoteUser, rawMessage)
 			if err != nil {

@@ -62,70 +62,70 @@ func (P *Peer) readBroker(ctx context.Context) {
 	const fn = "peer.readBroker"
 
 	for {
-		chat, ok := <-P.Broker.UpdateOnBack
-		if !ok {
-			log.Error(
-				fmt.Sprintf("%s: broker chan is closed", fn),
-			)
+		select {
+		case <-ctx.Done():
 			return
-		}
-
-		info, err := P.ConnectToPeer(ctx, chat.GetRemoteAddress())
-		if err != nil {
-			chat.SetConnStatus(defs.Failed)
-			P.Broker.UpdateOnFront <- chat
-
-			log.Error(
-				fmt.Sprintf("%s: during connecting to peer %w", fn, err),
-			)
-			continue
-		}
-
-		s, err := P.GetStreamToPeer(ctx, info.ID)
-		if err != nil {
-			chat.SetConnStatus(defs.Failed)
-			P.Broker.UpdateOnFront <- chat
-
-			log.Error(
-				fmt.Sprintf("%s: during getting stream to peer %w", fn, err),
-			)
-			continue
-		}
-
-		pendingMsgs := make([]*defs.Message, 0, 3)
-
-		chat.Mutex.RLock()
-
-		for _, msg := range slices.Backward(chat.Messages) {
-			if msg.Status == defs.Sent {
-				break
-			}
-
-			if msg.Status == defs.Pending {
-				pendingMsgs = append(pendingMsgs, msg)
-			}
-		}
-
-		chat.Mutex.RUnlock()
-
-		for _, msg := range slices.Backward(pendingMsgs) {
-			msg.Mutex.Lock()
-
-			msg.Author = P.MyPeerID
-
-			err = P.WriteToStream(s.Stream, msg.Message)
-			if err != nil {
+		case chat, ok := <-P.Broker.UpdateOnBack:
+			if !ok {
 				log.Error(
-					fmt.Sprintf("%s: during writing to stream %w", fn, err),
+					fmt.Sprintf("%s: broker chan is closed", fn),
 				)
+				return
+			}
 
-				msg.Status = defs.Error
-				msg.Mutex.Unlock()
+			info, err := P.ConnectToPeer(ctx, chat.GetRemoteAddress())
+			if err != nil {
+				P.closeFailedConnection(chat)
+
+				log.Error(
+					fmt.Sprintf("%s: during connecting to peer %w", fn, err),
+				)
 				continue
 			}
 
-			msg.Status = defs.Sent
-			msg.Mutex.Unlock()
+			s, err := P.GetStreamToPeer(ctx, info.ID)
+			if err != nil {
+				P.closeFailedConnection(chat)
+
+				log.Error(
+					fmt.Sprintf("%s: during getting stream to peer %w", fn, err),
+				)
+				continue
+			}
+
+			pendingMsgs := make([]*defs.Message, 0, 3)
+
+			chat.Mutex.RLock()
+
+			for _, msg := range slices.Backward(chat.Messages) {
+				if msg.Status == defs.Sent {
+					break
+				}
+
+				if msg.Status == defs.Pending {
+					pendingMsgs = append(pendingMsgs, msg)
+				}
+			}
+
+			chat.Mutex.RUnlock()
+
+			for _, msg := range slices.Backward(pendingMsgs) {
+				msg.Mutex.Lock()
+
+				err = P.WriteToStream(s.Stream, msg.Message)
+				if err != nil {
+					log.Error(
+						fmt.Sprintf("%s: during writing to stream %w", fn, err),
+					)
+
+					msg.Status = defs.Error
+					msg.Mutex.Unlock()
+					continue
+				}
+
+				msg.Status = defs.Sent
+				msg.Mutex.Unlock()
+			}
 		}
 	}
 }

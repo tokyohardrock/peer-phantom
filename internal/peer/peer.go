@@ -1,7 +1,6 @@
 package peer
 
 import (
-	"bufio"
 	"context"
 	"crypto/ecdh"
 	"errors"
@@ -318,12 +317,10 @@ func (P *Peer) readFromStream(s network.Stream) {
 	const fn = "peer.ReadFromStream"
 
 	remoteUser := s.Conn().RemotePeer()
-	reader := bufio.NewReader(s)
-
 	var key []byte
 
 	for {
-		rawMessage, err := utils.ReadMessageWithLengthPrefix(reader)
+		rawMessage, err := utils.ReadMessageWithLengthPrefix(s)
 		if err != nil {
 			chat, err := P.Chats.GetChat(remoteUser.String())
 			if err == nil {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	log "log/slog"
+	"os"
 	"slices"
 	"sync"
 	"time"
@@ -159,13 +160,18 @@ func (P *Peer) Init(ctx context.Context, chats *defs.ChatStorage, broker defs.Br
 	// 	return fmt.Errorf("%s: ADVERTISE_IP is empty", fn)
 	// }
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		return fmt.Errorf("%s: port is not specified", fn)
+	}
+
 	privKey, err := loadPrivateKey(KEY_FILE)
 	if err != nil {
 		return fmt.Errorf("%s during loading private key: %w", fn, err)
 	}
 
 	host, err := libp2p.New(
-		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), // listen on all IPv4 addresses over TCP on port 4001
+		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", port)), // listen on all IPv4 addresses over TCP on a specified port
 		libp2p.Identity(privKey),
 		// libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
 		// 	res := make([]multiaddr.Multiaddr, 0, len(addrs))

@@ -253,6 +253,27 @@ func (P *Peer) GetStreamToPeer(ctx context.Context, info peer.ID) (*SafeStream, 
 	return stream, nil
 }
 
+func (P *Peer) DeleteStreamToPeer(ID string) {
+	const fn = "peer.DeleteStreamToPeer"
+
+	stream := P.CheckStream(ID)
+
+	P.StreamsMut.Lock()
+
+	if stream != nil {
+		err := stream.Stream.Reset()
+		if err != nil {
+			log.Error(
+				fmt.Sprintf("%s: during stream close attempt: %w", fn, err),
+			)
+		}
+	}
+
+	delete(P.Streams, ID)
+
+	P.StreamsMut.Unlock()
+}
+
 func (P *Peer) getKeyToStream(remoteUser peer.ID, info []byte) ([]byte, error) {
 	const fn = "peer.getKeyToStream"
 

@@ -322,15 +322,16 @@ func (P *Peer) readFromStream(s network.Stream) {
 	for {
 		rawMessage, err := utils.ReadMessageWithLengthPrefix(s)
 		if err != nil {
+			log.Error(
+				fmt.Sprintf("%s during reading message with prefix: %w", fn, err),
+			)
+
 			chat, err := P.Chats.GetChat(remoteUser.String())
 			if err == nil {
 				chat.SetConnStatus(defs.Failed)
 				P.Broker.UpdateOnFront <- chat
 			}
 
-			log.Error(
-				fmt.Sprintf("%s during reading message with prefix: %v", fn, err),
-			)
 			return
 		}
 

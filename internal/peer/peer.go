@@ -129,6 +129,28 @@ func (P *Peer) readBroker(ctx context.Context) {
 	}
 }
 
+func (P *Peer) refreshConnections(ctx context.Context) {
+	const fn = "peer.refreshConnections"
+
+	refreshRate := 250 * time.Millisecond
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(refreshRate):
+			chats := P.Chats.GetChatSlice()
+
+			for _, chat := range chats {
+				if chat.GetConnStatus() == defs.Failed {
+					chat.SetConnStatus(defs.Connecting)
+					P.Broker.UpdateOnBack <- chat
+				}
+			}
+		}
+	}
+}
+
 func (P *Peer) Init(ctx context.Context, chats *defs.ChatStorage, broker defs.Broker) error {
 	const fn = "peer.Init"
 
@@ -201,6 +223,7 @@ func (P *Peer) Init(ctx context.Context, chats *defs.ChatStorage, broker defs.Br
 	})
 
 	go P.readBroker(ctx)
+	go P.refreshConnections(ctx)
 
 	return nil
 }

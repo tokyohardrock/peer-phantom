@@ -328,8 +328,7 @@ func (P *Peer) readFromStream(s network.Stream) {
 
 			chat, err := P.Chats.GetChat(remoteUser.String())
 			if err == nil {
-				chat.SetConnStatus(defs.Failed)
-				P.Broker.UpdateOnFront <- chat
+				P.closeFailedConnection(chat)
 			}
 
 			return

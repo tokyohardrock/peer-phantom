@@ -1,12 +1,12 @@
 package utils
 
 import (
-	"bufio"
 	"encoding/binary"
 	"fmt"
+	"io"
 )
 
-func ReadMessageWithLengthPrefix(reader *bufio.Reader) ([]byte, error) {
+func ReadMessageWithLengthPrefix(reader io.Reader) ([]byte, error) {
 	const fn = "peer.readMessageWithPrefix"
 
 	prefix := make([]byte, 4)

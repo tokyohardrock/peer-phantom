@@ -51,6 +51,13 @@ type Peer struct {
 	Broker defs.Broker
 }
 
+func (P *Peer) closeFailedConnection(chat *defs.ChatData) {
+	P.DeleteStreamToPeer(chat.GetChatID())
+	chat.SetConnStatus(defs.Failed)
+
+	P.Broker.UpdateOnFront <- chat
+}
+
 func (P *Peer) readBroker(ctx context.Context) {
 	const fn = "peer.readBroker"
 

@@ -15,10 +15,11 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	sigChan := make(chan os.Signal, 1)
-	go gracefulShutdown(sigChan)
+	go gracefulShutdown(sigChan, cancel)
 
 	f, err := os.OpenFile("debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
@@ -54,9 +55,9 @@ func main() {
 	}
 }
 
-func gracefulShutdown(sigChan chan os.Signal) {
+func gracefulShutdown(sigChan chan os.Signal, cancelContext context.CancelFunc) {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	os.Exit(0)
+	cancelContext()
 }

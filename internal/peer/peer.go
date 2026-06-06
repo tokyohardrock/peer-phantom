@@ -26,7 +26,6 @@ import (
 
 const (
 	PROTOCOL = "/peer-phantom/1.0.0"
-	KEY_FILE = "key" // the name of the file that will contain the identifier
 	TIMEOUT  = 5
 )
 
@@ -165,7 +164,7 @@ func (P *Peer) Init(ctx context.Context, chats *defs.ChatStorage, broker defs.Br
 		return fmt.Errorf("%s: port is not specified", fn)
 	}
 
-	privKey, err := loadPrivateKey(KEY_FILE)
+	privKey, err := loadPrivateKey()
 	if err != nil {
 		return fmt.Errorf("%s during loading private key: %w", fn, err)
 	}

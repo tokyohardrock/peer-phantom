@@ -21,7 +21,7 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	go gracefulShutdown(sigChan, cancel)
 
-	f, err := os.OpenFile("debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile("debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

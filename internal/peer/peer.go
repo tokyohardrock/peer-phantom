@@ -425,7 +425,12 @@ func (P *Peer) WriteToStream(s network.Stream, rawMessage string) error {
 		return fmt.Errorf("%s during encrypting message: %w", fn, err)
 	}
 
-	_, err = s.Write(utils.AddLengthPrefixToMessage(message))
+	messageWithLengthPrefix, err := utils.AddLengthPrefixToMessage(message)
+	if err != nil {
+		return fmt.Errorf("%s: during message prefixing %w", fn, err)
+	}
+
+	_, err = s.Write(messageWithLengthPrefix)
 	if err != nil {
 		return fmt.Errorf("%s during writing message to stream: %w", fn, err)
 	}
@@ -476,7 +481,9 @@ func (P *Peer) streamsHandler(s network.Stream) (*SafeStream, error) {
 	P.Streams[s.Conn().RemotePeer().String()] = stream
 	P.StreamsMut.Unlock()
 
-	_, err := s.Write(utils.AddLengthPrefixToMessage(P.SessionPubKeys))
+	pubKeyWithPrefix, _ := utils.AddLengthPrefixToMessage(P.SessionPubKeys)
+
+	_, err := s.Write(pubKeyWithPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("%s during writing session public keys to stream: %w", fn, err)
 	}

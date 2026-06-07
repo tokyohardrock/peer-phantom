@@ -172,6 +172,7 @@ func (P *Peer) Init(ctx context.Context, chats *defs.ChatStorage, broker defs.Br
 	host, err := libp2p.New(
 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", port)), // listen on all IPv4 addresses over TCP on a specified port
 		libp2p.Identity(privKey),
+		libp2p.NoSecurity, // disables default libp2p transport encryption
 		// libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
 		// 	res := make([]multiaddr.Multiaddr, 0, len(addrs))
 

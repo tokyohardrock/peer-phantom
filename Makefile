@@ -1,5 +1,6 @@
+BINARY_PATH ?= .
 build-app:
-	@go build -o test/phantom cmd/main.go
+	@go build -o $(BINARY_PATH) cmd/main.go
 	@echo "Done!"
 
 docker-build:

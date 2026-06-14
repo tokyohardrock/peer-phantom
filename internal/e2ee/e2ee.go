@@ -48,7 +48,7 @@ func GenerateSessionKeys(peerPrivKey crypto.PrivKey) (*ecdh.PrivateKey, []byte, 
 	return sessionPrivKey, keys, nil
 }
 
-// VerifySessionPubKey verifies that "signedSessionPubBytes" was signed via sender's private peer id
+// VerifySessionPubKey verifies that "signedSessionPubBytes" was signed via sender's private peer key
 func VerifySessionPubKey(senderPubKey crypto.PubKey, keysBytes []byte) ([]byte, error) {
 	const fn = "e2ee.VerifySessionPubKey"
 

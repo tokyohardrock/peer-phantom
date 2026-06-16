@@ -291,6 +291,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func createPadding(content, terminalHeight int) string {
+	paddingLines := terminalHeight - content
+	padding := ""
+	if paddingLines > 0 {
+		padding = strings.Repeat("\n", paddingLines)
+	}
+
+	return padding
+}
+
 func (m model) View() tea.View {
 	var v tea.View
 

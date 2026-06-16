@@ -26,6 +26,7 @@ const (
 	screenList sessionState = iota
 	screenChat
 	screenInfo
+	screenConnect
 )
 
 type chatModel struct {
@@ -98,9 +99,20 @@ func initialListModel(items []list.Item) list.Model {
 	return list
 }
 
+func initialNewChatInput() textinput.Model {
+	textinput := textinput.New()
+
+	textinput.Placeholder = "/ip4/0.0.0.0/tcp/..."
+	textinput.Prompt = "Enter multiaddress: "
+	textinput.CharLimit = 150
+
+	return textinput
+}
+
 type model struct {
-	list list.Model
-	chat chatModel
+	list         list.Model
+	chat         chatModel
+	newChatInput textinput.Model
 
 	chats  *defs.ChatStorage
 	broker defs.Broker
@@ -208,6 +220,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.list, cmd = m.list.Update(msg)
 		cmds = append(cmds, cmd)
+		case screenConnect:
+			switch msg := msg.(type) {
+			case tea.KeyPressMsg:
+				switch msg.String() {
+				case "ctrl+c":
+					return m, tea.Quit
+				case "esc":
+					m.state = screenList
+					m.newChatInput.Reset()
+
+					return m, nil
+				case "enter":
+					address := strings.TrimSpace(m.newChatInput.Value())
+
+					newChat, err := m.chats.AddChat(address)
+					if err != nil {
+						log.Error(
+							fmt.Sprintf("%s (connect): %v", fn, err),
+						)
+						return m, nil
+					}
+
+					m.broker.UpdateOnBack <- newChat
+
+					m.state = screenList
+					m.newChatInput.Reset()
+
+					return m, nil
+				}
+			}
+
+			m.newChatInput, cmd = m.newChatInput.Update(msg)
+			cmds = append(cmds, cmd)
 	case screenInfo:
 		switch msg := msg.(type) {
 		case tea.KeyPressMsg:
@@ -290,10 +335,11 @@ func Run(chats *defs.ChatStorage, broker defs.Broker, myAddresses []string) erro
 				chats.GetChatSlice(),
 			),
 		),
-		chat:   initialChatModel(),
-		chats:  chats,
-		broker: broker,
-		peer:   myAddresses,
+		chat:         initialChatModel(),
+		newChatInput: initialNewChatInput(),
+		chats:        chats,
+		broker:       broker,
+		peer:         myAddresses,
 	}
 
 	p := tea.NewProgram(m)

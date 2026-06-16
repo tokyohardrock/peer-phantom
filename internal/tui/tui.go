@@ -294,6 +294,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() tea.View {
 	var v tea.View
 
+	titleStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("4")).
+		Foreground(lipgloss.Color("0"))
+
 	switch m.state {
 	case screenList:
 		title := lipgloss.NewStyle().

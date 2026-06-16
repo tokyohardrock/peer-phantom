@@ -207,13 +207,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	case screenChat:
 		switch msg := msg.(type) {
-		case tea.MouseWheelMsg:
-			switch msg.Mouse().Button {
-			case tea.MouseWheelUp:
-				m.chat.viewport.ScrollUp(1)
-			case tea.MouseWheelDown:
-				m.chat.viewport.ScrollDown(1)
-			}
 		case tea.KeyPressMsg:
 			switch msg.String() {
 			case "ctrl+c":

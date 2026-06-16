@@ -62,11 +62,7 @@ func initialChatModel() chatModel {
 }
 
 func convertChatDataIntoListItem(items []*defs.ChatData) []list.Item {
-	listItems := make([]list.Item, 0, len(items)+1)
-
-	listItems = append(listItems, &defs.ChatData{
-		ID: "Test Chat",
-	})
+	listItems := make([]list.Item, 0, len(items))
 
 	for _, item := range items {
 		listItems = append(listItems, item)
@@ -203,9 +199,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				m.chat.selectedChat = selectedItem.(*defs.ChatData)
-				m.list.Select(1)
 				m.chat.selectedChat.MarkAsRead()
 				m.state = screenChat
+
+				m.list.Select(0)
 
 				refreshChatView()
 				m.chat.textarea.Reset()

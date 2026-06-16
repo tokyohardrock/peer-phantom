@@ -92,6 +92,8 @@ func initialListModel(items []list.Item) list.Model {
 	list.SetShowStatusBar(false)
 	list.SetShowTitle(false)
 
+	list.KeyMap.Quit.SetKeys()
+
 	return list
 }
 

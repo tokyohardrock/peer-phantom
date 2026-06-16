@@ -310,14 +310,41 @@ func (m model) View() tea.View {
 
 	switch m.state {
 	case screenList:
-		title := lipgloss.NewStyle().
-			Background(lipgloss.Color("4")).
-			Foreground(lipgloss.Color("0")).
-			Render(" PEER PHANTOM ") + "\n"
-		//helpStr := "\n" + "↑/↓: navigate    /: search    Enter: open chat    Q: quit"
-		addresses := "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("8")).
+		title := titleStyle.Render(" PEER PHANTOM // CHATS ") + "\n\n"
+
+		mainContent := docStyle.Render(title + m.list.View())
+		helpStr := "↑/↓: navigate    /: search    Ctrl+N: new chat    Ctrl+I: info    Ctrl+C: quit"
+
+		padding := createPadding(lipgloss.Height(mainContent)+lipgloss.Height(helpStr), m.terminalHeight)
+
+		v = tea.NewView(mainContent + padding + helpStr)
+	case screenConnect:
+		title := titleStyle.Render(" PEER PHANTOM // NEW CHAT ") + "\n\n"
+		inputView := m.newChatInput.View()
+
+		mainContent := docStyle.Render(title + inputView)
+		helpStr := "Enter: start chat    Esc: back"
+
+		padding := createPadding(lipgloss.Height(mainContent)+lipgloss.Height(helpStr), m.terminalHeight)
+
+		v = tea.NewView(mainContent + padding + helpStr)
+	case screenInfo:
+		title := titleStyle.Render(" PEER PHANTOM // INFO ") + "\n\n"
+
+		subTitle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("8")).
+			Render("Your addresses:") + "\n\n"
+
+		addresses := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("7")).
 			Render(strings.Join(m.peer, "\n"))
-		v = tea.NewView(docStyle.Render(title + m.list.View() + addresses))
+
+		mainContent := docStyle.Render(title + subTitle + addresses)
+		helpStr := "Esc: back"
+
+		padding := createPadding(lipgloss.Height(mainContent)+lipgloss.Height(helpStr), m.terminalHeight)
+
+		v = tea.NewView(mainContent + padding + helpStr)
 	case screenChat:
 		viewportView := m.chat.viewport.View()
 		content := viewportView + "\n" + m.chat.textarea.View()

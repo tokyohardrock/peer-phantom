@@ -25,6 +25,7 @@ type sessionState int
 const (
 	screenList sessionState = iota
 	screenChat
+	screenInfo
 )
 
 type chatModel struct {
@@ -207,6 +208,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.list, cmd = m.list.Update(msg)
 		cmds = append(cmds, cmd)
+	case screenInfo:
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			switch msg.String() {
+			case "ctrl+c":
+				return m, tea.Quit
+			case "esc":
+				m.state = screenList
+				return m, nil
+			}
+		}
 	case screenChat:
 		switch msg := msg.(type) {
 		case tea.KeyPressMsg:

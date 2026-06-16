@@ -116,6 +116,8 @@ type model struct {
 	state sessionState
 
 	peer []string
+
+	terminalHeight int
 }
 
 func (m model) Init() tea.Cmd {
@@ -152,6 +154,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.terminalHeight = msg.Height
+
 		h, v := docStyle.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v-4) // subtract 4 to keep space for help str
 

@@ -186,8 +186,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "ctrl+c":
 				return m, tea.Quit
-			case "q":
-				return m, tea.Quit
+			case "ctrl+i":
+				m.state = screenInfo
+				return m, nil
+			case "ctrl+n":
+				m.state = screenConnect
+				cmd = m.newChatInput.Focus()
+
+				return m, cmd
 			case "enter":
 				selectedItem := m.list.SelectedItem()
 

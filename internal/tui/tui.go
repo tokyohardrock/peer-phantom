@@ -196,19 +196,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			case "enter":
 				selectedItem := m.list.SelectedItem()
-
 				if selectedItem == nil {
-					newChat, err := m.chats.AddChat(m.list.FilterValue())
-					if err != nil {
-						log.Error(
-							fmt.Sprintf("%s: %v", fn, err),
-						)
-						return m, nil
-					}
-
-					m.broker.UpdateOnBack <- newChat
-					m.list.ResetFilter()
-
 					return m, nil
 				}
 

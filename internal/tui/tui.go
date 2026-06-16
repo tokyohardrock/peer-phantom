@@ -157,7 +157,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		h, v := docStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v-3)
+		m.list.SetSize(msg.Width-h, msg.Height-v-4) // subtract 4 to keep space for help str
+
+		m.newChatInput.SetWidth(msg.Width - h - len(m.newChatInput.Prompt))
 
 		m.chat.viewport.SetWidth(msg.Width)
 		m.chat.textarea.SetWidth(msg.Width)

@@ -16,6 +16,10 @@ import (
 )
 
 var docStyle = lipgloss.NewStyle().Margin(1, 1)
+var yourMsgStyle = lipgloss.
+	NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("4"))
 
 type ChatUpdateMsg struct {
 	Chat *defs.ChatData

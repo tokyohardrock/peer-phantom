@@ -249,39 +249,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.list, cmd = m.list.Update(msg)
 		cmds = append(cmds, cmd)
-		case screenConnect:
-			switch msg := msg.(type) {
-			case tea.KeyPressMsg:
-				switch msg.String() {
-				case "ctrl+c":
-					return m, tea.Quit
-				case "esc":
-					m.state = screenList
-					m.newChatInput.Reset()
+	case screenConnect:
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			switch msg.String() {
+			case "ctrl+c":
+				return m, tea.Quit
+			case "esc":
+				m.state = screenList
+				m.newChatInput.Reset()
 
-					return m, nil
-				case "enter":
-					address := strings.TrimSpace(m.newChatInput.Value())
+				return m, nil
+			case "enter":
+				address := strings.TrimSpace(m.newChatInput.Value())
 
-					newChat, err := m.chats.AddChat(address)
-					if err != nil {
-						log.Error(
-							fmt.Sprintf("%s (connect): %v", fn, err),
-						)
-						return m, nil
-					}
-
-					m.broker.UpdateOnBack <- newChat
-
-					m.state = screenList
-					m.newChatInput.Reset()
-
+				newChat, err := m.chats.AddChat(address)
+				if err != nil {
+					log.Error(
+						fmt.Sprintf("%s (connect): %v", fn, err),
+					)
 					return m, nil
 				}
-			}
 
-			m.newChatInput, cmd = m.newChatInput.Update(msg)
-			cmds = append(cmds, cmd)
+				m.broker.UpdateOnBack <- newChat
+
+				m.state = screenList
+				m.newChatInput.Reset()
+
+				return m, nil
+			}
+		}
+
+		m.newChatInput, cmd = m.newChatInput.Update(msg)
+		cmds = append(cmds, cmd)
 	case screenInfo:
 		switch msg := msg.(type) {
 		case tea.KeyPressMsg:

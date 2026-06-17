@@ -143,7 +143,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		content := ""
 
 		if m.chat.selectedChat != nil {
-			content = strings.Join(m.chat.selectedChat.GetMessageSlice(), "\n")
+			messages := m.chat.selectedChat.GetMessageSlice()
+
+			for i := range messages {
+				author := messages[i].Author
+
+				switch author {
+				case "You":
+					author = yourMsgStyle.
+						Render(
+							strings.Join([]string{messages[i].Author, ": "}, ""),
+						)
+				default:
+					// use the last byte of remote peer id to assign it a static nickname color without separate variable creation
+					// it lies in a range [1, 6] which matches lipgloss color consts for main colors excluding black and white to keep it colorful
+					color := strconv.Itoa(
+						int(author[len(author)-1])%6 + 1,
+					)
+
+					author = yourMsgStyle.
+						Foreground(lipgloss.Color(color)).
+						Render(
+							strings.Join([]string{messages[i].Author, ": "}, ""),
+						)
+				}
+
+				msg := strings.Join([]string{author, messages[i].Message, "\n"}, "")
+				content = strings.Join([]string{content, msg}, "")
+			}
 		}
 
 		m.chat.viewport.SetContent(

@@ -103,15 +103,18 @@ func (d *ChatData) SetConnStatus(status ConnStatus) {
 	d.Mutex.Unlock()
 }
 
-func (d *ChatData) GetMessageSlice() []string {
+func (d *ChatData) GetMessageSlice() []Message {
 	d.Mutex.RLock()
 	defer d.Mutex.RUnlock()
 
-	s := make([]string, 0, len(d.Messages))
+	s := make([]Message, 0, len(d.Messages))
 
 	for _, m := range d.Messages {
-		message := strings.Join([]string{m.Author, m.Message}, ": ")
-		s = append(s, message)
+		s = append(s, Message{
+			Author:  m.Author,
+			Message: m.Message,
+			Status:  m.Status,
+		})
 	}
 
 	return s

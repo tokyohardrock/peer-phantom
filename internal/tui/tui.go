@@ -20,6 +20,9 @@ var yourMsgStyle = lipgloss.
 	NewStyle().
 	Bold(true).
 	Foreground(lipgloss.Color("4"))
+var titleStyle = lipgloss.NewStyle().
+	Background(lipgloss.Color("4")).
+	Foreground(lipgloss.Color("0"))
 
 type ChatUpdateMsg struct {
 	Chat *defs.ChatData
@@ -335,10 +338,6 @@ func createPadding(content, terminalHeight int) string {
 
 func (m model) View() tea.View {
 	var v tea.View
-
-	titleStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("4")).
-		Foreground(lipgloss.Color("0"))
 
 	switch m.state {
 	case screenList:

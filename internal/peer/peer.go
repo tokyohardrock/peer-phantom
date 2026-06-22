@@ -154,10 +154,10 @@ func (P *Peer) refreshConnections(ctx context.Context) {
 func (P *Peer) Init(ctx context.Context, chats *defs.ChatStorage, broker defs.Broker) error {
 	const fn = "peer.Init"
 
-	// advertiseIP := os.Getenv("ADVERTISE_IP")
-	// if advertiseIP == "" {
-	// 	return fmt.Errorf("%s: ADVERTISE_IP is empty", fn)
-	// }
+	IP := os.Getenv("IP")
+	if IP == "" {
+		return fmt.Errorf("%s: IP is empty", fn)
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -173,34 +173,34 @@ func (P *Peer) Init(ctx context.Context, chats *defs.ChatStorage, broker defs.Br
 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", port)), // listen on all IPv4 addresses over TCP on a specified port
 		libp2p.Identity(privKey),
 		libp2p.NoSecurity, // disables default libp2p transport encryption
-		// libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
-		// 	res := make([]multiaddr.Multiaddr, 0, len(addrs))
+		libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+			res := make([]multiaddr.Multiaddr, 0, len(addrs))
 
-		// 	for _, addr := range addrs {
-		// 		port, err := addr.ValueForProtocol(multiaddr.P_TCP) // gets port from local multiaddress (4001)
-		// 		if err != nil {
-		// 			log.Error(
-		// 				fmt.Sprintf("%s something went wrong during port pasring: %w", fn, err),
-		// 			)
-		// 			continue
-		// 		}
+			for _, addr := range addrs {
+				port, err := addr.ValueForProtocol(multiaddr.P_TCP) // gets port from local multiaddress
+				if err != nil {
+					log.Error(
+						fmt.Sprintf("%s something went wrong during port pasring: %w", fn, err),
+					)
+					continue
+				}
 
-		// 		publicAddr, err := multiaddr.NewMultiaddr(
-		// 			fmt.Sprintf("/ip4/%s/tcp/%s", advertiseIP, port),
-		// 		)
-		// 		if err != nil {
-		// 			log.Error(
-		// 				fmt.Sprintf("%s something went wrong during new multiaddress validation: %w", fn, err),
-		// 			)
-		// 			continue
-		// 		}
+				publicAddr, err := multiaddr.NewMultiaddr(
+					fmt.Sprintf("/ip4/%s/tcp/%s", IP, port),
+				)
+				if err != nil {
+					log.Error(
+						fmt.Sprintf("%s something went wrong during new multiaddress validation: %w", fn, err),
+					)
+					continue
+				}
 
-		// 		res = append(res, publicAddr)
-		// 	}
+				res = append(res, publicAddr)
+			}
 
-		// 	return res
-		// }),
-		// libp2p.DisableIdentifyAddressDiscovery(),
+			return res
+		}),
+		libp2p.DisableIdentifyAddressDiscovery(),
 	)
 	if err != nil {
 		return fmt.Errorf("%s during creating libp2p host: %w", fn, err)

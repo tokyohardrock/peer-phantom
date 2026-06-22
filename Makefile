@@ -7,10 +7,12 @@ docker-build:
 	@sudo docker build -t peer-phantom .
 	@echo "Done!"
 
+PORT ?= 4001
 docker-run:
-	@ADVERTISE_IP="$$(ip route get 1.1.1.1 | awk '{for(i=1;i<=NF;i++) if($$i=="src") {print $$(i+1); exit}}')"; \
-	echo "Using ADVERTISE_IP=$$ADVERTISE_IP"; \
+	@IP="$$(ip route get 1.1.1.1 | awk '{for(i=1;i<=NF;i++) if($$i=="src") {print $$(i+1); exit}}')"; \
+	echo "Using IP=$$IP"; \
 	sudo docker run -it --rm --name peer-phantom \
-		-p 4001:4001 \
-		-e ADVERTISE_IP="$$ADVERTISE_IP" \
+		-p $(PORT):$(PORT) \
+		-e IP="$$IP" \
+		-e PORT="$(PORT)" \
 		peer-phantom
